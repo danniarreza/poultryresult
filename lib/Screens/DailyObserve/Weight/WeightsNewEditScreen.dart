@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:intl/intl.dart';
 import 'package:poultryresult/Services/database_helper.dart';
+import 'package:poultryresult/Services/globalidentifier_generator.dart';
 import 'package:poultryresult/Services/rest_api.dart';
 import 'package:poultryresult/Widgets/Sidebar_Main.dart';
 import 'package:poultryresult/Widgets/dialogs.dart';
 import 'package:poultryresult/Widgets/homescreenappbar.dart';
 import 'package:poultryresult/Widgets/homescreenheader.dart';
+import 'package:poultryresult/Widgets/observationscreenheader.dart';
 
 class WeightsNewEditScreen extends StatefulWidget {
   @override
@@ -18,7 +20,7 @@ class _WeightsNewEditScreenState extends State<WeightsNewEditScreen> {
   bool isNew;
   
   DateTime selectedDateTime = DateTime.now();
-  int observationId;
+  String observationId;
   int amountWeight;
 
   Map<String, dynamic> routeData = {};
@@ -44,13 +46,16 @@ class _WeightsNewEditScreenState extends State<WeightsNewEditScreen> {
 
   _getFarmSiteInformation() async {
     List<Map<String, dynamic>> users = await DatabaseHelper.instance.get('user');
-    List<Map<String, dynamic>> farm_sites = await DatabaseHelper.instance.getById('farm_sites', users[0]['_farm_sites_id']);
+    List<Map<String, dynamic>> farm_sites = await DatabaseHelper.instance.getWhere('farm_sites', ['_farm_sites_id'], [users[0]['_farm_sites_id']]);
 
-    List<Map<String, dynamic>> management_locations = await DatabaseHelper.instance.getById('management_location', users[0]['_management_location_id']);
-    List<Map<String, dynamic>> locations = await DatabaseHelper.instance.getById('location', management_locations[0]['management_location_location_id']);
+    List<Map<String, dynamic>> management_locations = await DatabaseHelper.instance.getWhere('management_location', ['_management_location_id'], [users[0]['_management_location_id']]);
+
+    List<Map<String, dynamic>> animal_locations = await DatabaseHelper.instance.getWhere('animal_location', ['_animal_location_id'], [management_locations[0]['management_location_animal_location_id']]);
     List<Map<String, dynamic>> rounds = await DatabaseHelper.instance.getById('round', management_locations[0]['management_location_round_id']);
 
-    List<Map<String, dynamic>> observedanimalcounts = await DatabaseHelper.instance.getByReference('observed_animal_count', 'management_location', 'observed_animal_counts_aln_id', management_locations[0]['_management_location_id']);
+    List<Map<String, dynamic>> observedanimalcounts = await DatabaseHelper.instance.getWhere(
+        'observed_animal_count', ['observed_animal_counts_mln_id'], [management_locations[0]['_management_location_id']]
+    );
 
     int animal_count = 0;
 
@@ -63,7 +68,7 @@ class _WeightsNewEditScreenState extends State<WeightsNewEditScreen> {
     new_management_location = {
       ...management_locations[0],
       'animal_count' : animal_count,
-      'location' : locations[0],
+      'location' : animal_locations[0],
       'round' : rounds[0],
 
     };
@@ -74,6 +79,7 @@ class _WeightsNewEditScreenState extends State<WeightsNewEditScreen> {
       management_location = new_management_location;
       farmSiteLoaded = true;
     });
+
   }
 
 
@@ -119,7 +125,7 @@ class _WeightsNewEditScreenState extends State<WeightsNewEditScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: <Widget>[
                                 Text(
-                                    "House : " + user['_location_id'].toString(),
+                                    "House : " + user['_animal_location_id'].toString(),
                                     style: TextStyle(
                                         color: Colors.black,
                                         fontFamily: "Montserrat",
@@ -315,37 +321,38 @@ class _WeightsNewEditScreenState extends State<WeightsNewEditScreen> {
   formSubmit() async{
     Dialogs.waitingDialog(context, "Submitting...", "Please Wait", false);
 
-    int management_location_id = management_location['_management_location_id'];
+    String management_location_id = management_location['_management_location_id'];
     String uu_id = "fiwnefwnf";
     String measurement_date = DateFormat('yyyy-MM-dd').format(selectedDateTime);
+    String creation_date = DateFormat("yyyy-MM-dd HH:mm:ss").format(DateTime.now());
     int weight_amount = amountWeight;
     String weight_unit = 'kg';
     String user_name =  user['user_name'];
 
     if(isNew == true){
-      List<Map<String, dynamic>> weights = await DatabaseHelper.instance.get('observed_weight');
-      int weight_id = weights.length > 0 ? weights[weights.length - 1]['_observed_weight_id'] + 1 : 1;
+//      List<Map<String, dynamic>> weights = await DatabaseHelper.instance.get('observed_weight');
+//      int weight_id = weights.length > 0 ? weights[weights.length - 1]['_observed_weight_id'] + 1 : 1;
 
+      String weight_id = generate_GlobalIdentifier();
       print(weight_id);
-      print(weight_amount);
 
       int id = await DatabaseHelper.instance.insert('observed_weight', {
         DatabaseHelper.observed_weight_id: weight_id,
-        DatabaseHelper.observed_weight_uu_id: uu_id,
-        DatabaseHelper.observed_weight_aln_id: management_location_id,
+        DatabaseHelper.observed_weight_mln_id: management_location_id,
         DatabaseHelper.observed_weight_measurement_date : measurement_date,
-        DatabaseHelper.observed_weight_amount : weight_amount,
+        DatabaseHelper.observed_weight_creation_date : creation_date,
+        DatabaseHelper.observed_weight_weights : weight_amount,
         DatabaseHelper.observed_weight_unit : weight_unit,
-        DatabaseHelper.observed_weight_creation_date : measurement_date,
         DatabaseHelper.observed_weight_observed_by : user_name
       });
 
       String url = "weight/insert";
 
       Map<String, dynamic> params = {
+        "weight_id": weight_id,
         "management_location_id" : management_location_id,
-        "uu_id" : uu_id,
         "measurement_date" : measurement_date,
+        "creation_date" : creation_date,
         "weight": weight_amount,
         "unit": weight_unit,
         "user_name": user_name
@@ -360,13 +367,12 @@ class _WeightsNewEditScreenState extends State<WeightsNewEditScreen> {
 
 
     } else if(isNew == false){
-      int weight_id = observationId;
+      String weight_id = observationId;
       await DatabaseHelper.instance.update('observed_weight', {
         DatabaseHelper.observed_weight_id: weight_id,
-        DatabaseHelper.observed_weight_uu_id: uu_id,
-        DatabaseHelper.observed_weight_aln_id: management_location_id,
+        DatabaseHelper.observed_weight_mln_id: management_location_id,
         DatabaseHelper.observed_weight_measurement_date : measurement_date,
-        DatabaseHelper.observed_weight_amount : weight_amount,
+        DatabaseHelper.observed_weight_weights : weight_amount,
         DatabaseHelper.observed_weight_unit : weight_unit,
         DatabaseHelper.observed_weight_observed_by : user_name
       });
@@ -384,8 +390,6 @@ class _WeightsNewEditScreenState extends State<WeightsNewEditScreen> {
       };
 
       dynamic responseJSON = await postData(params, url);
-
-      print(responseJSON);
 
       if(responseJSON['status'] == 'Success'){
         Navigator.pop(context);
@@ -422,7 +426,7 @@ class _WeightsNewEditScreenState extends State<WeightsNewEditScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              HomeScreenHeader(),
+              ObservationScreenHeader(),
               Expanded(
                 child: Container(
 //                padding: EdgeInsets.symmetric(horizontal: 20),

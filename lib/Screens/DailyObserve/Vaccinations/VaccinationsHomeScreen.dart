@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:intl/intl.dart';
 import 'package:poultryresult/Services/database_helper.dart';
+import 'package:poultryresult/Services/rest_api.dart';
 import 'package:poultryresult/Widgets/dialogs.dart';
 import 'package:poultryresult/Widgets/homescreenappbar.dart';
 import 'package:poultryresult/Widgets/homescreenheader.dart';
 import 'package:poultryresult/Widgets/Sidebar_Main.dart';
+import 'package:poultryresult/Widgets/observationscreenheader.dart';
 
 class VaccinationsHomeScreen extends StatefulWidget {
   @override
@@ -14,26 +16,15 @@ class VaccinationsHomeScreen extends StatefulWidget {
 
 class _VaccinationsHomeScreenState extends State<VaccinationsHomeScreen> {
 
-  List<Map> VaccinationsInspectionList = [
-    {
-      "vaccination_round": 1,
-      "vaccination_article": "Baycox 25mg/ml",
-      "vaccination_amount": 1
-    },
-    {
-      "vaccination_round": 2,
-      "vaccination_article": "Baycox 25mg/ml",
-      "vaccination_amount": 1
-    },
-  ];
-
   Map<String, dynamic> user;
   Map<String, dynamic> farm_site;
   Map<String, dynamic> management_location;
+  List<Map<String, dynamic>> inputUsesInspectionList;
 
   bool farmSiteLoaded = false;
+  bool inputUsesLoaded = false;
 
-  DateTime _selectedDateTime = DateTime.now();
+  DateTime selectedDateTime = DateTime.now();
 
   @override
   void initState() {
@@ -45,13 +36,16 @@ class _VaccinationsHomeScreenState extends State<VaccinationsHomeScreen> {
 
   _getFarmSiteInformation() async {
     List<Map<String, dynamic>> users = await DatabaseHelper.instance.get('user');
-    List<Map<String, dynamic>> farm_sites = await DatabaseHelper.instance.getById('farm_sites', users[0]['_farm_sites_id']);
+    List<Map<String, dynamic>> farm_sites = await DatabaseHelper.instance.getWhere('farm_sites', ['_farm_sites_id'], [users[0]['_farm_sites_id']]);
 
-    List<Map<String, dynamic>> management_locations = await DatabaseHelper.instance.getById('management_location', users[0]['_management_location_id']);
-    List<Map<String, dynamic>> locations = await DatabaseHelper.instance.getById('location', management_locations[0]['management_location_location_id']);
+    List<Map<String, dynamic>> management_locations = await DatabaseHelper.instance.getWhere('management_location', ['_management_location_id'], [users[0]['_management_location_id']]);
+
+    List<Map<String, dynamic>> animal_locations = await DatabaseHelper.instance.getWhere('animal_location', ['_animal_location_id'], [management_locations[0]['management_location_animal_location_id']]);
     List<Map<String, dynamic>> rounds = await DatabaseHelper.instance.getById('round', management_locations[0]['management_location_round_id']);
 
-    List<Map<String, dynamic>> observedanimalcounts = await DatabaseHelper.instance.getByReference('observed_animal_count', 'management_location', 'observed_animal_counts_aln_id', management_locations[0]['_management_location_id']);
+    List<Map<String, dynamic>> observedanimalcounts = await DatabaseHelper.instance.getWhere(
+        'observed_animal_count', ['observed_animal_counts_mln_id'], [management_locations[0]['_management_location_id']]
+    );
 
     int animal_count = 0;
 
@@ -64,18 +58,83 @@ class _VaccinationsHomeScreenState extends State<VaccinationsHomeScreen> {
     new_management_location = {
       ...management_locations[0],
       'animal_count' : animal_count,
-      'location' : locations[0],
+      'location' : animal_locations[0],
       'round' : rounds[0],
 
     };
 
-    print(new_management_location);
+//    print(new_management_location);
 
     setState(() {
       user = users[0];
       farm_site = farm_sites[0];
       management_location = new_management_location;
       farmSiteLoaded = true;
+    });
+
+    _getVaccinationSelectedDate();
+  }
+
+  _getVaccinationSelectedDate() async {
+    setState(() {
+      inputUsesLoaded = false;
+    });
+
+    List<Map<String, dynamic>> observedInputUses = List<Map<String, dynamic>>();
+
+    List<Map<String, dynamic>> observedInputUsesFromDB = await DatabaseHelper.instance.getWhere(
+        'observed_input_uses',
+        [
+          'observed_input_uses_mln_id',
+          'observed_input_uses_measurement_date',
+          'observed_input_uses_oue_type'
+        ],
+        [
+          management_location['_management_location_id'],
+          DateFormat('yyyy-MM-dd').format(selectedDateTime),
+          'Medication'
+        ]
+    );
+
+    observedInputUsesFromDB.forEach((oiu) async {
+      Map<String, dynamic> observedInputUse = Map<String, dynamic>();
+      List<Map<String, dynamic>> observedInputTypes = List<Map<String, dynamic>>();
+      List<Map<String, dynamic>> observedInputTypesFromDB = await DatabaseHelper.instance.getWhere(
+          'observed_input_types', ['observed_input_types_oue_id'], [oiu['_observed_input_uses_id']]
+      );
+
+
+      observedInputTypesFromDB.forEach((oit) async {
+        Map<String, dynamic> observedInputType = Map<String, dynamic>();
+        Map<String, dynamic> inputType = Map<String, dynamic>();
+        List<Map<String, dynamic>> inputTypesFromDB = await DatabaseHelper.instance.getById('input_types', oit['observed_input_types_ite_id']);
+
+        inputType = inputTypesFromDB[0];
+
+        observedInputType = {
+          ...oit,
+          'input_type' : inputType
+        };
+
+        observedInputTypes.add(observedInputType);
+
+        observedInputUse = {
+          ...oiu,
+          'observed_input_types' : observedInputTypes
+        };
+
+        observedInputUses.add(observedInputUse);
+
+//        print(observedInputUses);
+
+      });
+    });
+
+    Future.delayed(Duration(milliseconds: 250), (){
+      setState(() {
+        inputUsesInspectionList = observedInputUses;
+        inputUsesLoaded = true;
+      });
     });
   }
 
@@ -97,7 +156,7 @@ class _VaccinationsHomeScreenState extends State<VaccinationsHomeScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
                     Text(
-                      "House : " + user['_location_id'].toString(),
+                      "House : " + user['_animal_location_id'].toString(),
                       style: TextStyle(
                           color: Colors.black,
                           fontFamily: "Montserrat",
@@ -219,12 +278,12 @@ class _VaccinationsHomeScreenState extends State<VaccinationsHomeScreen> {
                   onPressed: () async {
                     Dialogs.waitingDialog(context, "Fetching...", "Please Wait", false);
 
-                    Future.delayed(Duration(milliseconds: 500), (){
-                      Navigator.pop(context);
-                    });
                     setState(() {
-                      _selectedDateTime = _selectedDateTime.add(Duration(days: -1));
+                      selectedDateTime = selectedDateTime.add(Duration(days: -1));
+                      _getVaccinationSelectedDate();
                     });
+
+                    Navigator.pop(context);
                   },
                 ),
               )
@@ -249,18 +308,18 @@ class _VaccinationsHomeScreenState extends State<VaccinationsHomeScreen> {
                             if(date != null){
                               Dialogs.waitingDialog(context, "Fetching...", "Please Wait", false);
 
-                              Future.delayed(Duration(milliseconds: 500), (){
-                                Navigator.pop(context);
-                              });
                               setState((){
-                                _selectedDateTime = date;
+                                selectedDateTime = date;
+                                _getVaccinationSelectedDate();
                               });
+
+                              Navigator.pop(context);
                             }
                           });
                         },
                         title: Center(
                           child: Text(
-                            DateFormat('dd MMMM yyyy').format(_selectedDateTime),
+                            DateFormat('dd MMMM yyyy').format(selectedDateTime),
                           ),
                         )
                     )
@@ -289,12 +348,12 @@ class _VaccinationsHomeScreenState extends State<VaccinationsHomeScreen> {
                 onPressed: (){
                   Dialogs.waitingDialog(context, "Fetching...", "Please Wait", false);
 
-                  Future.delayed(Duration(milliseconds: 500), (){
-                    Navigator.pop(context);
-                  });
                   setState(() {
-                    _selectedDateTime = _selectedDateTime.add(Duration(days: 1));
+                    selectedDateTime = selectedDateTime.add(Duration(days: 1));
+                    _getVaccinationSelectedDate();
                   });
+
+                  Navigator.pop(context);
                 },
               ),
             ),
@@ -305,92 +364,181 @@ class _VaccinationsHomeScreenState extends State<VaccinationsHomeScreen> {
   }
 
   _buildVaccinationsInspectionCards(){
-    return Expanded(
-      child: Container(
-        child: ListView.builder(
-          itemCount: VaccinationsInspectionList.length,
-          itemBuilder: (BuildContext context, int index){
-            Map dailyObserve = VaccinationsInspectionList[index];
-            return Padding(
-              padding: EdgeInsets.fromLTRB(20, 0, 20, 10),
-              child: Card(
-                elevation: 1.5,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                child: ListTile(
-                  contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 15),                  onTap: (){
-                    Navigator.pushNamed(context, "/dailyobservevaccinesneweditscreen");
+    if(inputUsesLoaded == false){
+      return Container(
+        margin: EdgeInsets.only(top: 25),
+        child: SpinKitThreeBounce(
+            color: Color.fromRGBO(253, 184, 19, 1),
+            size: 30
+        ),
+      );
+    } else if(inputUsesLoaded == true){
+      if(inputUsesInspectionList.length == 0){
+        return Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: <Widget>[
+            Container(
+                margin: EdgeInsets.only(top: 25),
+                child: Text("No data found")),
+          ],
+        );
+      } else if(inputUsesInspectionList.length > 0){
+        return Expanded(
+          child: Container(
+            child: ListView.builder(
+              itemCount: inputUsesInspectionList.length,
+              itemBuilder: (BuildContext context, int index){
+                Map dailyObserve = inputUsesInspectionList[index];
+                return Dismissible(
+                  key: Key(dailyObserve['_observed_input_uses_id']),
+                  onDismissed: (direction) async {
+
+                    String url = "observedinputuses/delete";
+
+                    Map<String, dynamic> params = {
+                      "observed_input_use_id": dailyObserve['_observed_input_uses_id'],
+                      "user_name" : user['user_name']
+                    };
+
+                    dynamic responseJSON = await postData(params, url);
+
+                    dailyObserve['observed_input_types'].forEach((element) async {
+                      await DatabaseHelper.instance.deleteWhere('observed_input_types', ['_observed_input_types_id'], [element['_observed_input_types_id']]);
+                    });
+
+                    int deletedCount = await DatabaseHelper.instance.deleteWhere('observed_input_uses', ['_observed_input_uses_id'], [dailyObserve['_observed_input_uses_id']]);
+                    print(deletedCount);
+
+                    setState(() {
+                      inputUsesInspectionList.removeAt(index);
+                    });
                   },
-                  title: GestureDetector(
-                    onTap: (){
-                      Navigator.pushNamed(context, "/dailyobservevaccinesneweditscreen");
-                    },
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        Text(
-                          "Vaccination Round : ${dailyObserve['vaccination_round']}",
-                          style: TextStyle(
-                              color: Colors.black,
-                              fontFamily: "Montserrat",
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600
-                          ),
-                        ),
-                        Container(
-                          height: 0.25,
-                          margin: EdgeInsets.symmetric(vertical: 10),
-                          color: Colors.grey,
-                        ),
-                        Container(
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(20, 0, 20, 10),
+                    child: Card(
+                      elevation: 1.5,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      child: ListTile(
+                        contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                        onTap: (){
+                          Navigator.pushNamed(context, "/dailyobservevaccinesneweditscreen", arguments: {
+                            'observedInputUsesId' : dailyObserve['_observed_input_uses_id'],
+                            'observedInputTypesId' : dailyObserve['observed_input_types'][0]['_observed_input_types_id'],
+                            'inspectionRound': dailyObserve['observed_input_uses_treatment_nr'],
+                            'selectedDateTime' : selectedDateTime,
+                            'vaccinationAmount' : dailyObserve['observed_input_uses_total_amount'],
+                            'selectedInputType': dailyObserve['observed_input_types'][0]['input_type']
+                          }).then((reload) => _getFarmSiteInformation());
+                          },
+                        title: GestureDetector(
+                          onTap: (){
+                            Navigator.pushNamed(context, "/dailyobservevaccinesneweditscreen", arguments: {
+                              'observedInputUsesId' : dailyObserve['_observed_input_uses_id'],
+                              'observedInputTypesId' : dailyObserve['observed_input_types'][0]['_observed_input_types_id'],
+                              'inspectionRound': dailyObserve['observed_input_uses_treatment_nr'],
+                              'selectedDateTime' : selectedDateTime,
+                              'vaccinationAmount' : dailyObserve['observed_input_uses_total_amount'],
+                              'selectedInputType': dailyObserve['observed_input_types'][0]['input_type']
+                            }).then((reload) => _getFarmSiteInformation());
+                          },
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: <Widget>[
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: <Widget>[
-                                  Text(
-                                      "Vaccine : ${dailyObserve['vaccination_article']}",
-                                      style: TextStyle(
-                                          color: Colors.black,
-                                          fontFamily: "Montserrat",
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w400
-                                      )
-                                  ),
-                                ],
+                              Text(
+                                "Vaccination Round : " + dailyObserve['observed_input_uses_treatment_nr'].toString(),
+                                style: TextStyle(
+                                    color: Colors.black,
+                                    fontFamily: "Montserrat",
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600
+                                ),
                               ),
-                              SizedBox(
-                                width: MediaQuery.of(context).size.width / 30,
+                              Container(
+                                height: 0.25,
+                                margin: EdgeInsets.symmetric(vertical: 10),
+                                color: Colors.grey,
                               ),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: <Widget>[
-                                  Text(
-                                      "Amount : ${dailyObserve['vaccination_amount']} [l]",
-                                      style: TextStyle(
-                                          color: Colors.black,
-                                          fontFamily: "Montserrat",
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w400
-                                      )
-                                  ),
-                                ],
+                              Container(
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: <Widget>[
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: <Widget>[
+                                        Text(
+                                            dailyObserve['observed_input_types'].length > 0 ?
+                                            "Article : " + dailyObserve['observed_input_types'][0]['input_type']['input_types_code'] :
+                                            "Article : empty",
+                                            style: TextStyle(
+                                                color: Colors.black,
+                                                fontFamily: "Montserrat",
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w400
+                                            )
+                                        ),
+                                        SizedBox(
+                                          height: 5,
+                                        ),
+                                        Text(
+                                            "Amount : " + dailyObserve['observed_input_uses_total_amount'].toString(),
+                                            style: TextStyle(
+                                                color: Colors.black,
+                                                fontFamily: "Montserrat",
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w400
+                                            )
+                                        )
+                                      ],
+                                    ),
+                                    SizedBox(
+                                      width: MediaQuery.of(context).size.width / 30,
+                                    ),
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: <Widget>[
+                                        Text(
+                                            "Measurement :",
+                                            style: TextStyle(
+                                                color: Colors.black,
+                                                fontFamily: "Montserrat",
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w400
+                                            )
+                                        ),
+                                        SizedBox(
+                                          height: 5,
+                                        ),
+                                        Text(
+                                            dailyObserve['observed_input_uses_unit'] != null ?
+                                            dailyObserve['observed_input_uses_unit'] :
+                                            dailyObserve['observed_input_types'][0]['input_type']['input_types_uom'],
+                                            style: TextStyle(
+                                                color: Colors.black,
+                                                fontFamily: "Montserrat",
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w400
+                                            )
+                                        )
+                                      ],
+                                    ),
+                                  ],
+                                ),
                               ),
                             ],
                           ),
                         ),
-                      ],
+                      ),
                     ),
                   ),
-                ),
-              ),
-            );
-          },
-        ),
-      ),
-    );
+                );
+              },
+            ),
+          ),
+        );
+      }
+    }
   }
 
 
@@ -406,7 +554,7 @@ class _VaccinationsHomeScreenState extends State<VaccinationsHomeScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            HomeScreenHeader(),
+            ObservationScreenHeader(),
             Expanded(
               child: Container(
 //                padding: EdgeInsets.symmetric(horizontal: 20),
@@ -424,26 +572,26 @@ class _VaccinationsHomeScreenState extends State<VaccinationsHomeScreen> {
                   ),
                   child: Column(
                     children: <Widget>[
+//                      Row(
+//                        children: <Widget>[
+//                          Container(
+//                            padding: EdgeInsets.fromLTRB(30, 20, 30, 5),
+//                            child: Text(
+//                              "Daily Observations",
+//                              style: TextStyle(
+//                                  fontFamily: "Montserrat",
+//                                  fontSize: 20,
+//                                  fontWeight: FontWeight.bold
+//                              ),
+//                            ),
+//                          ),
+//                        ],
+//                      ),
+//                      _buildHouseInformationCard(),
                       Row(
                         children: <Widget>[
                           Container(
-                            padding: EdgeInsets.fromLTRB(30, 20, 30, 5),
-                            child: Text(
-                              "Daily Observations",
-                              style: TextStyle(
-                                  fontFamily: "Montserrat",
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      _buildHouseInformationCard(),
-                      Row(
-                        children: <Widget>[
-                          Container(
-                            padding: EdgeInsets.fromLTRB(30, 5, 30, 0),
+                            padding: EdgeInsets.fromLTRB(30, 20, 30, 0),
                             child: Text(
                               "Vaccinations",
                               style: TextStyle(
@@ -470,7 +618,10 @@ class _VaccinationsHomeScreenState extends State<VaccinationsHomeScreen> {
         backgroundColor: Color.fromRGBO(253, 184, 19, 1),
         focusColor: Colors.white,
         onPressed: (){
-          Navigator.pushNamed(context, "/dailyobservevaccinesneweditscreen");
+          Navigator.pushNamed(context, "/dailyobservevaccinesneweditscreen", arguments: {
+            'inspectionRound': inputUsesInspectionList.length + 1,
+            'selectedDateTime' : selectedDateTime,
+          }).then((reload) => _getFarmSiteInformation());
         },
       ),
     );

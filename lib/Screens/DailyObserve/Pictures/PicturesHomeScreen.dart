@@ -6,6 +6,7 @@ import 'package:poultryresult/Widgets/homescreenappbar.dart';
 import 'package:poultryresult/Widgets/homescreenheader.dart';
 import 'package:poultryresult/Widgets/Sidebar_Main.dart';
 import 'package:intl/intl.dart';
+import 'package:poultryresult/Widgets/observationscreenheader.dart';
 
 class PicturesHomeScreen extends StatefulWidget {
   @override
@@ -44,7 +45,9 @@ class _PicturesHomeScreenState extends State<PicturesHomeScreen> {
     List<Map<String, dynamic>> locations = await DatabaseHelper.instance.getById('location', management_locations[0]['management_location_location_id']);
     List<Map<String, dynamic>> rounds = await DatabaseHelper.instance.getById('round', management_locations[0]['management_location_round_id']);
 
-    List<Map<String, dynamic>> observedanimalcounts = await DatabaseHelper.instance.getByReference('observed_animal_count', 'management_location', 'observed_animal_counts_aln_id', management_locations[0]['_management_location_id']);
+    List<Map<String, dynamic>> observedanimalcounts = await DatabaseHelper.instance.getWhere(
+        'observed_animal_count', ['observed_animal_counts_aln_id'], [management_locations[0]['_management_location_id']]
+    );
 
     int animal_count = 0;
 
@@ -355,7 +358,7 @@ class _PicturesHomeScreenState extends State<PicturesHomeScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            HomeScreenHeader(),
+            ObservationScreenHeader(),
             Expanded(
               child: Container(
 //                padding: EdgeInsets.symmetric(horizontal: 20),
@@ -389,26 +392,26 @@ class _PicturesHomeScreenState extends State<PicturesHomeScreen> {
                             ),
                             child: Column(
                               children: <Widget>[
+//                                Row(
+//                                  children: <Widget>[
+//                                    Container(
+//                                      padding: EdgeInsets.fromLTRB(30, 20, 30, 5),
+//                                      child: Text(
+//                                        "Daily Observations",
+//                                        style: TextStyle(
+//                                            fontFamily: "Montserrat",
+//                                            fontSize: 20,
+//                                            fontWeight: FontWeight.bold
+//                                        ),
+//                                      ),
+//                                    ),
+//                                  ],
+//                                ),
+//                                _buildHouseInformationCard(),
                                 Row(
                                   children: <Widget>[
                                     Container(
-                                      padding: EdgeInsets.fromLTRB(30, 20, 30, 5),
-                                      child: Text(
-                                        "Daily Observations",
-                                        style: TextStyle(
-                                            fontFamily: "Montserrat",
-                                            fontSize: 20,
-                                            fontWeight: FontWeight.bold
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                _buildHouseInformationCard(),
-                                Row(
-                                  children: <Widget>[
-                                    Container(
-                                      padding: EdgeInsets.fromLTRB(30, 5, 30, 0),
+                                      padding: EdgeInsets.fromLTRB(30, 20, 30, 0),
                                       child: Text(
                                         "Pictures",
                                         style: TextStyle(

@@ -315,13 +315,16 @@ class _DailyObserveHouseDetailScreenState extends State<DailyObserveHouseDetailS
 
   _getFarmSiteInformation() async {
     List<Map<String, dynamic>> users = await DatabaseHelper.instance.get('user');
-    List<Map<String, dynamic>> farm_sites = await DatabaseHelper.instance.getById('farm_sites', users[0]['_farm_sites_id']);
+    List<Map<String, dynamic>> farm_sites = await DatabaseHelper.instance.getWhere('farm_sites', ['_farm_sites_id'], [users[0]['_farm_sites_id']]);
 
-    List<Map<String, dynamic>> management_locations = await DatabaseHelper.instance.getById('management_location', users[0]['_management_location_id']);
-    List<Map<String, dynamic>> locations = await DatabaseHelper.instance.getById('location', management_locations[0]['management_location_location_id']);
-    List<Map<String, dynamic>> rounds = await DatabaseHelper.instance.getById('round', management_locations[0]['management_location_round_id']);
+    List<Map<String, dynamic>> management_locations = await DatabaseHelper.instance.getWhere('management_location', ['_management_location_id'], [users[0]['_management_location_id']]);
 
-    List<Map<String, dynamic>> observedanimalcounts = await DatabaseHelper.instance.getByReference('observed_animal_count', 'management_location', 'observed_animal_counts_aln_id', management_locations[0]['_management_location_id']);
+    List<Map<String, dynamic>> animal_locations = await DatabaseHelper.instance.getWhere('animal_location', ['_animal_location_id'], [management_locations[0]['management_location_animal_location_id']]);
+    List<Map<String, dynamic>> rounds = await DatabaseHelper.instance.getWhere('round', ['_round_id'], [management_locations[0]['management_location_round_id']]);
+
+    List<Map<String, dynamic>> observedanimalcounts = await DatabaseHelper.instance.getWhere(
+        'observed_animal_count', ['observed_animal_counts_mln_id'], [management_locations[0]['_management_location_id']]
+    );
 
     int animal_count = 0;
 
@@ -334,7 +337,7 @@ class _DailyObserveHouseDetailScreenState extends State<DailyObserveHouseDetailS
     new_management_location = {
       ...management_locations[0],
       'animal_count' : animal_count,
-      'location' : locations[0],
+      'animal_location' : animal_locations[0],
       'round' : rounds[0],
 
     };
@@ -367,7 +370,7 @@ class _DailyObserveHouseDetailScreenState extends State<DailyObserveHouseDetailS
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
                     Text(
-                      "House : " + user['_location_id'].toString(),
+                      "House : " + user['_animal_location_id'].toString(),
                       style: TextStyle(
                           color: Colors.black,
                           fontFamily: "Montserrat",

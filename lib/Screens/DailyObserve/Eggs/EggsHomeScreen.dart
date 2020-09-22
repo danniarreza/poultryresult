@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:intl/intl.dart';
 import 'package:poultryresult/Services/database_helper.dart';
+import 'package:poultryresult/Services/rest_api.dart';
 import 'package:poultryresult/Widgets/dialogs.dart';
 import 'package:poultryresult/Widgets/homescreenappbar.dart';
 import 'package:poultryresult/Widgets/homescreenheader.dart';
 import 'package:poultryresult/Widgets/Sidebar_Main.dart';
+import 'package:poultryresult/Widgets/observationscreenheader.dart';
 
 class EggsHomeScreen extends StatefulWidget {
   @override
@@ -39,8 +41,9 @@ class _EggsHomeScreenState extends State<EggsHomeScreen> {
   Map<String, dynamic> management_location;
 
   bool farmSiteLoaded = false;
+  bool eggsLoaded = false;
 
-  DateTime _selectedDateTime = DateTime.now();
+  DateTime selectedDateTime = DateTime.now();
 
   @override
   void initState() {
@@ -52,13 +55,16 @@ class _EggsHomeScreenState extends State<EggsHomeScreen> {
 
   _getFarmSiteInformation() async {
     List<Map<String, dynamic>> users = await DatabaseHelper.instance.get('user');
-    List<Map<String, dynamic>> farm_sites = await DatabaseHelper.instance.getById('farm_sites', users[0]['_farm_sites_id']);
+    List<Map<String, dynamic>> farm_sites = await DatabaseHelper.instance.getWhere('farm_sites', ['_farm_sites_id'], [users[0]['_farm_sites_id']]);
 
-    List<Map<String, dynamic>> management_locations = await DatabaseHelper.instance.getById('management_location', users[0]['_management_location_id']);
-    List<Map<String, dynamic>> locations = await DatabaseHelper.instance.getById('location', management_locations[0]['management_location_location_id']);
+    List<Map<String, dynamic>> management_locations = await DatabaseHelper.instance.getWhere('management_location', ['_management_location_id'], [users[0]['_management_location_id']]);
+
+    List<Map<String, dynamic>> animal_locations = await DatabaseHelper.instance.getWhere('animal_location', ['_animal_location_id'], [management_locations[0]['management_location_animal_location_id']]);
     List<Map<String, dynamic>> rounds = await DatabaseHelper.instance.getById('round', management_locations[0]['management_location_round_id']);
 
-    List<Map<String, dynamic>> observedanimalcounts = await DatabaseHelper.instance.getByReference('observed_animal_count', 'management_location', 'observed_animal_counts_aln_id', management_locations[0]['_management_location_id']);
+    List<Map<String, dynamic>> observedanimalcounts = await DatabaseHelper.instance.getWhere(
+        'observed_animal_count', ['observed_animal_counts_mln_id'], [management_locations[0]['_management_location_id']]
+    );
 
     int animal_count = 0;
 
@@ -71,12 +77,10 @@ class _EggsHomeScreenState extends State<EggsHomeScreen> {
     new_management_location = {
       ...management_locations[0],
       'animal_count' : animal_count,
-      'location' : locations[0],
+      'location' : animal_locations[0],
       'round' : rounds[0],
 
     };
-
-    print(new_management_location);
 
     setState(() {
       user = users[0];
@@ -84,6 +88,44 @@ class _EggsHomeScreenState extends State<EggsHomeScreen> {
       management_location = new_management_location;
       farmSiteLoaded = true;
     });
+
+    _getEggsSelectedDate();
+
+  }
+
+  _getEggsSelectedDate() async {
+    setState(() {
+      eggsLoaded = false;
+    });
+
+    print(management_location['_management_location_id']);
+    print(DateFormat('yyyy-MM-dd').format(selectedDateTime));
+
+    List<Map<String, dynamic>> eggsFromDB = await DatabaseHelper.instance.getWhere(
+        'observed_egg_production',
+        [
+          'observed_egg_production_mln_id',
+          'observed_egg_production_measurement_date'
+        ],
+        [
+          management_location['_management_location_id'],
+          DateFormat('yyyy-MM-dd').format(selectedDateTime)
+        ]
+    );
+
+    List<Map<String, dynamic>> eggsDate = List<Map<String, dynamic>>();
+
+    eggsDate.addAll(eggsFromDB);
+
+    Future.delayed(Duration(milliseconds: 250), (){
+      setState(() {
+        setState(() {
+          eggsInspectionList = eggsDate;
+          eggsLoaded = true;
+        });
+      });
+    });
+
   }
 
   _buildHouseInformationCard(){
@@ -104,7 +146,7 @@ class _EggsHomeScreenState extends State<EggsHomeScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
                     Text(
-                      "House : " + user['_location_id'].toString(),
+                      "House : " + user['_animal_location_id'].toString(),
                       style: TextStyle(
                           color: Colors.black,
                           fontFamily: "Montserrat",
@@ -200,7 +242,8 @@ class _EggsHomeScreenState extends State<EggsHomeScreen> {
   _buildEggsDateSelector(){
     return Container(
       height: 57.5,
-      margin: EdgeInsets.symmetric(horizontal: 25, vertical: 10),
+//      margin: EdgeInsets.symmetric(horizontal: 25, vertical: 10),
+      margin: EdgeInsets.symmetric(horizontal: 25, vertical: MediaQuery.of(context).size.height / 100),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: <Widget>[
@@ -226,12 +269,12 @@ class _EggsHomeScreenState extends State<EggsHomeScreen> {
                   onPressed: () async {
                     Dialogs.waitingDialog(context, "Fetching...", "Please Wait", false);
 
-                    Future.delayed(Duration(milliseconds: 500), (){
-                      Navigator.pop(context);
-                    });
                     setState(() {
-                      _selectedDateTime = _selectedDateTime.add(Duration(days: -1));
+                      selectedDateTime = selectedDateTime.add(Duration(days: -1));
+                      _getEggsSelectedDate();
                     });
+
+                    Navigator.pop(context);
                   },
                 ),
               )
@@ -256,18 +299,18 @@ class _EggsHomeScreenState extends State<EggsHomeScreen> {
                             if(date != null){
                               Dialogs.waitingDialog(context, "Fetching...", "Please Wait", false);
 
-                              Future.delayed(Duration(milliseconds: 500), (){
-                                Navigator.pop(context);
-                              });
                               setState((){
-                                _selectedDateTime = date;
+                                selectedDateTime = date;
+                                _getEggsSelectedDate();
                               });
+
+                              Navigator.pop(context);
                             }
                           });
                         },
                         title: Center(
                           child: Text(
-                            DateFormat('dd MMMM yyyy').format(_selectedDateTime),
+                            DateFormat('dd MMMM yyyy').format(selectedDateTime),
                           ),
                         )
                     )
@@ -296,12 +339,12 @@ class _EggsHomeScreenState extends State<EggsHomeScreen> {
                 onPressed: (){
                   Dialogs.waitingDialog(context, "Fetching...", "Please Wait", false);
 
-                  Future.delayed(Duration(milliseconds: 500), (){
-                    Navigator.pop(context);
-                  });
                   setState(() {
-                    _selectedDateTime = _selectedDateTime.add(Duration(days: 1));
+                    selectedDateTime = selectedDateTime.add(Duration(days: 1));
+                    _getEggsSelectedDate();
                   });
+
+                  Navigator.pop(context);
                 },
               ),
             ),
@@ -311,120 +354,166 @@ class _EggsHomeScreenState extends State<EggsHomeScreen> {
     );
   }
 
-  _buildEggsInspectionCards(){
-    return Expanded(
-      child: Container(
-        child: ListView.builder(
-          itemCount: eggsInspectionList.length,
-          itemBuilder: (BuildContext context, int index){
-            Map dailyObserve = eggsInspectionList[index];
-            return Padding(
-              padding: EdgeInsets.fromLTRB(20, 0, 20, 10),
-              child: Card(
-                elevation: 1.5,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                child: ListTile(
-                  contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-                  onTap: (){
-                    Navigator.pushNamed(context, "/dailyobserveeggsneweditscreen");
+  _buildEggProductionCards(){
+    if(eggsLoaded == false){
+      return Container(
+        margin: EdgeInsets.only(top: 25),
+        child: SpinKitThreeBounce(
+            color: Color.fromRGBO(253, 184, 19, 1),
+            size: 30
+        ),
+      );
+    } else if(eggsLoaded == true){
+      if(eggsInspectionList.length == 0){
+        return Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: <Widget>[
+            Container(
+                margin: EdgeInsets.only(top: 25),
+                child: Text("No data found")),
+          ],
+        );
+      } else if(eggsInspectionList.length > 0){
+        return Expanded(
+          child: Container(
+            child: ListView.builder(
+              itemCount: eggsInspectionList.length,
+              itemBuilder: (BuildContext context, int index){
+                Map dailyObserve = eggsInspectionList[index];
+                return Dismissible(
+                  key: Key(dailyObserve['_observed_egg_production_id']),
+                  onDismissed: (direction) async {
+
+                    String url = "eggproduction/delete";
+
+                    Map<String, dynamic> params = {
+                      "observed_egg_production_id": dailyObserve['_observed_egg_production_id'],
+                      "user_name" : user['user_name']
+                    };
+
+                    dynamic responseJSON = await postData(params, url);
+                    int deletedCount = await DatabaseHelper.instance.deleteWhere('observed_egg_production', ['_observed_egg_production_id'], [dailyObserve['_observed_egg_production_id']]);
+                    print(deletedCount);
+
+                    setState(() {
+                      eggsInspectionList.removeAt(index);
+                    });
                   },
-                  title: GestureDetector(
-                    onTap: (){
-                      Navigator.pushNamed(context, "/dailyobserveeggsneweditscreen");
-                    },
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        Text(
-                          "Quality : ${dailyObserve['egg_quality']}",
-                          style: TextStyle(
-                              color: Colors.black,
-                              fontFamily: "Montserrat",
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(20, 0, 20, 10),
+                    child: Card(
+                      elevation: 1.5,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      child: ListTile(
+                        contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                        onTap: (){
+                          Navigator.pushNamed(context, "/dailyobserveeggsneweditscreen", arguments: {
+                            'observationId': dailyObserve['_observed_egg_production_id'],
+                            'amountFirstQuality': dailyObserve['observed_egg_production_first_quality'],
+                            'amountSecondQuality' : dailyObserve['observed_egg_production_second_quality'],
+                            'amountGroundEggs': dailyObserve['observed_egg_production_ground_eggs'],
+                            'eggWeight': dailyObserve['observed_egg_production_egg_weight'],
+                            'weightUnit': dailyObserve['observed_egg_production_weight_unit'],
+                            'selectedDateTime' : DateTime.parse(dailyObserve['observed_egg_production_measurement_date'])
+                          }).then((reload) => _getFarmSiteInformation());
+                        },
+                        title: GestureDetector(
+                          onTap: (){
+                            Navigator.pushNamed(context, "/dailyobserveeggsneweditscreen", arguments: {
+                              'observationId': dailyObserve['_observed_egg_production_id'],
+                              'amountFirstQuality': dailyObserve['observed_egg_production_first_quality'],
+                              'amountSecondQuality' : dailyObserve['observed_egg_production_second_quality'],
+                              'amountGroundEggs': dailyObserve['observed_egg_production_ground_eggs'],
+                              'eggWeight': dailyObserve['observed_egg_production_egg_weight'],
+                              'weightUnit': dailyObserve['observed_egg_production_weight_unit'],
+                              'selectedDateTime' : DateTime.parse(dailyObserve['observed_egg_production_measurement_date'])
+                            }).then((reload) => _getFarmSiteInformation());
+                          },
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: <Widget>[
+                              Text(
+                                "Egg Production : ",
+                                style: TextStyle(
+                                    color: Colors.black,
+                                    fontFamily: "Montserrat",
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600
+                                ),
+                              ),
+                              Container(
+                                height: 0.25,
+                                margin: EdgeInsets.symmetric(vertical: 10),
+                                color: Colors.grey,
+                              ),
+                              Text(
+                                  "First Quality : " + dailyObserve['observed_egg_production_first_quality'].toString(),
+                                  style: TextStyle(
+                                      color: Colors.black,
+                                      fontFamily: "Montserrat",
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w400
+                                  )
+                              ),
+                              Container(
+                                height: 0.25,
+                                margin: EdgeInsets.symmetric(vertical: 10),
+                                color: Colors.grey[400],
+                              ),
+                              Text(
+                                  "Second Quality : " + dailyObserve['observed_egg_production_second_quality'].toString(),
+                                  style: TextStyle(
+                                      color: Colors.black,
+                                      fontFamily: "Montserrat",
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w400
+                                  )
+                              ),
+                              Container(
+                                height: 0.25,
+                                margin: EdgeInsets.symmetric(vertical: 10),
+                                color: Colors.grey[400],
+                              ),
+                              Text(
+                                  "Ground Eggs : " + dailyObserve['observed_egg_production_ground_eggs'].toString(),
+                                  style: TextStyle(
+                                      color: Colors.black,
+                                      fontFamily: "Montserrat",
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w400
+                                  )
+                              ),
+                              Container(
+                                height: 0.25,
+                                margin: EdgeInsets.symmetric(vertical: 10),
+                                color: Colors.grey[400],
+                              ),
+                              Text(
+                                  "Egg Weight : " + dailyObserve['observed_egg_production_egg_weight'].toString() + ' ' + dailyObserve['observed_egg_production_weight_unit'],
+                                  style: TextStyle(
+                                      color: Colors.black,
+                                      fontFamily: "Montserrat",
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w400
+                                  )
+                              ),
+                            ],
                           ),
                         ),
-                        Container(
-                          height: 0.25,
-                          margin: EdgeInsets.symmetric(vertical: 10),
-                          color: Colors.grey,
-                        ),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: <Widget>[
-                            Flexible(
-                              flex: 1,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: <Widget>[
-                                  Text(
-                                      "Amount :",
-                                      style: TextStyle(
-                                          color: Colors.black,
-                                          fontFamily: "Montserrat",
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w400
-                                      )
-                                  ),
-                                  SizedBox(
-                                    height: 5,
-                                  ),
-                                  Text(
-                                      "${dailyObserve['egg_amount']}",
-                                      style: TextStyle(
-                                          color: Colors.black,
-                                          fontFamily: "Montserrat",
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w400
-                                      )
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: <Widget>[
-                                  Text(
-                                      "Weight :",
-                                      style: TextStyle(
-                                          color: Colors.black,
-                                          fontFamily: "Montserrat",
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w400
-                                      )
-                                  ),
-                                  SizedBox(
-                                    height: 5,
-                                  ),
-                                  Text(
-                                      "${dailyObserve['egg_weight']} ${dailyObserve['egg_weight_measurement']}",
-                                      style: TextStyle(
-                                          color: Colors.black,
-                                          fontFamily: "Montserrat",
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w400
-                                      )
-                                  ),
-                                ],
-                              ),
-                            )
-                          ],
-                        ),
-
-                      ],
+                      ),
                     ),
                   ),
-                ),
-              ),
-            );
-          },
-        ),
-      ),
-    );
+                );
+              },
+            ),
+          ),
+        );
+      }
+    }
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -438,7 +527,7 @@ class _EggsHomeScreenState extends State<EggsHomeScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            HomeScreenHeader(),
+            ObservationScreenHeader(),
             Expanded(
               child: Container(
 //                padding: EdgeInsets.symmetric(horizontal: 20),
@@ -472,26 +561,26 @@ class _EggsHomeScreenState extends State<EggsHomeScreen> {
                             ),
                             child: Column(
                               children: <Widget>[
+//                                Row(
+//                                  children: <Widget>[
+//                                    Container(
+//                                      padding: EdgeInsets.fromLTRB(30, 20, 30, 5),
+//                                      child: Text(
+//                                        "Daily Observations",
+//                                        style: TextStyle(
+//                                            fontFamily: "Montserrat",
+//                                            fontSize: 20,
+//                                            fontWeight: FontWeight.bold
+//                                        ),
+//                                      ),
+//                                    ),
+//                                  ],
+//                                ),
+//                                _buildHouseInformationCard(),
                                 Row(
                                   children: <Widget>[
                                     Container(
-                                      padding: EdgeInsets.fromLTRB(30, 20, 30, 5),
-                                      child: Text(
-                                        "Daily Observations",
-                                        style: TextStyle(
-                                            fontFamily: "Montserrat",
-                                            fontSize: 20,
-                                            fontWeight: FontWeight.bold
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                _buildHouseInformationCard(),
-                                Row(
-                                  children: <Widget>[
-                                    Container(
-                                      padding: EdgeInsets.fromLTRB(30, 5, 30, 0),
+                                      padding: EdgeInsets.fromLTRB(30, 20, 30, 0),
                                       child: Text(
                                         "Eggs",
                                         style: TextStyle(
@@ -504,7 +593,7 @@ class _EggsHomeScreenState extends State<EggsHomeScreen> {
                                   ],
                                 ),
                                 _buildEggsDateSelector(),
-                                _buildEggsInspectionCards(),
+                                _buildEggProductionCards(),
                               ],
                             ),
                           ),
@@ -518,14 +607,21 @@ class _EggsHomeScreenState extends State<EggsHomeScreen> {
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: eggsLoaded == true && eggsInspectionList.length < 1 ? FloatingActionButton(
         child: Icon(Icons.add),
         backgroundColor: Color.fromRGBO(253, 184, 19, 1),
         focusColor: Colors.white,
-        onPressed: (){
-          Navigator.pushNamed(context, "/dailyobserveeggsneweditscreen");
+        onPressed: () async {
+          if(eggsInspectionList.length < 1){
+            Navigator.pushNamed(context, "/dailyobserveeggsneweditscreen", arguments: {
+              'inspectionRound': eggsInspectionList.length + 1,
+              'selectedDateTime' : selectedDateTime
+            }).then((reload) => _getFarmSiteInformation());
+          } else {
+            await Dialogs.errorRetryDialog(context, "Inspection round has reached the limit", "Close", true);
+          }
         },
-      ),
+      ) : null,
     );
   }
 }

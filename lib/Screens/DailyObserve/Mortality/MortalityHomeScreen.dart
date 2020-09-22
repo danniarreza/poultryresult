@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:poultryresult/Services/database_helper.dart';
+import 'package:poultryresult/Services/rest_api.dart';
 import 'package:poultryresult/Widgets/dialogs.dart';
 import 'package:poultryresult/Widgets/homescreenappbar.dart';
 import 'package:poultryresult/Widgets/homescreenheader.dart';
 import 'package:poultryresult/Widgets/Sidebar_Main.dart';
 import 'package:intl/intl.dart';
+import 'package:poultryresult/Widgets/observationscreenheader.dart';
 
 class MortalityHomeScreen extends StatefulWidget {
   @override
@@ -14,27 +16,15 @@ class MortalityHomeScreen extends StatefulWidget {
 
 class _MortalityHomeScreenState extends State<MortalityHomeScreen> {
 
-//  List<Map> mortalityInspectionList = [
-//    {
-//      "inspection_round": 1,
-//      "culling_count": 293,
-//      "death_count": 21821
-//    },
-//    {
-//      "inspection_round": 2,
-//      "culling_count": 293,
-//      "death_count": 24143
-//    }
-//  ];
-
   Map<String, dynamic> user;
   Map<String, dynamic> farm_site;
   Map<String, dynamic> management_location;
   List<Map<String, dynamic>> mortalityInspectionList;
 
   bool farmSiteLoaded = false;
+  bool mortalityLoaded = false;
 
-  DateTime _selectedDateTime = DateTime.now();
+  DateTime selectedDateTime = DateTime.now();
 
   @override
   void initState() {
@@ -46,13 +36,16 @@ class _MortalityHomeScreenState extends State<MortalityHomeScreen> {
 
   _getFarmSiteInformation() async {
     List<Map<String, dynamic>> users = await DatabaseHelper.instance.get('user');
-    List<Map<String, dynamic>> farm_sites = await DatabaseHelper.instance.getById('farm_sites', users[0]['_farm_sites_id']);
+    List<Map<String, dynamic>> farm_sites = await DatabaseHelper.instance.getWhere('farm_sites', ['_farm_sites_id'], [users[0]['_farm_sites_id']]);
 
-    List<Map<String, dynamic>> management_locations = await DatabaseHelper.instance.getById('management_location', users[0]['_management_location_id']);
-    List<Map<String, dynamic>> locations = await DatabaseHelper.instance.getById('location', management_locations[0]['management_location_location_id']);
+    List<Map<String, dynamic>> management_locations = await DatabaseHelper.instance.getWhere('management_location', ['_management_location_id'], [users[0]['_management_location_id']]);
+
+    List<Map<String, dynamic>> animal_locations = await DatabaseHelper.instance.getWhere('animal_location', ['_animal_location_id'], [management_locations[0]['management_location_animal_location_id']]);
     List<Map<String, dynamic>> rounds = await DatabaseHelper.instance.getById('round', management_locations[0]['management_location_round_id']);
 
-    List<Map<String, dynamic>> observedanimalcounts = await DatabaseHelper.instance.getByReference('observed_animal_count', 'management_location', 'observed_animal_counts_aln_id', management_locations[0]['_management_location_id']);
+    List<Map<String, dynamic>> observedanimalcounts = await DatabaseHelper.instance.getWhere(
+        'observed_animal_count', ['observed_animal_counts_mln_id'], [management_locations[0]['_management_location_id']]
+    );
 
     int animal_count = 0;
 
@@ -62,16 +55,10 @@ class _MortalityHomeScreenState extends State<MortalityHomeScreen> {
 
     Map<String, dynamic> new_management_location = Map<String, dynamic>();
 
-    List<Map<String, dynamic>> mortalities = await DatabaseHelper.instance.getByReference('observed_mortality', 'management_location', 'observed_mortality_aln_id', management_locations[0]['_management_location_id']);
-
-//    mortalities.forEach((element) {
-//      print(element['_observed_mortality_id']);
-//    });
-
     new_management_location = {
       ...management_locations[0],
       'animal_count' : animal_count,
-      'location' : locations[0],
+      'location' : animal_locations[0],
       'round' : rounds[0],
 
     };
@@ -80,9 +67,47 @@ class _MortalityHomeScreenState extends State<MortalityHomeScreen> {
       user = users[0];
       farm_site = farm_sites[0];
       management_location = new_management_location;
-      mortalityInspectionList = mortalities;
       farmSiteLoaded = true;
     });
+
+    _getMortalitiesSelectedDate();
+  }
+
+  _getMortalitiesSelectedDate() async {
+    setState(() {
+      mortalityLoaded = false;
+    });
+
+    print(management_location['_management_location_id']);
+    print(DateFormat('yyyy-MM-dd').format(selectedDateTime));
+
+    List<Map<String, dynamic>> mortalitiesFromDB = await DatabaseHelper.instance.getWhere(
+        'observed_mortality',
+        [
+          'observed_mortality_mln_id',
+          'observed_mortality_measurement_date'
+        ],
+        [
+          management_location['_management_location_id'],
+          DateFormat('yyyy-MM-dd').format(selectedDateTime)
+        ]
+    );
+
+    List<Map<String, dynamic>> mortalitiesDate = List<Map<String, dynamic>>();
+
+    mortalitiesDate.addAll(mortalitiesFromDB);
+
+//    print(mortalitiesDate);
+
+    Future.delayed(Duration(milliseconds: 250), (){
+      setState(() {
+        setState(() {
+          mortalityInspectionList = mortalitiesDate;
+          mortalityLoaded = true;
+        });
+      });
+    });
+
   }
 
   _buildMortalityDateSelector(){
@@ -114,12 +139,12 @@ class _MortalityHomeScreenState extends State<MortalityHomeScreen> {
                   onPressed: () async {
                     Dialogs.waitingDialog(context, "Fetching...", "Please Wait", false);
 
-                    Future.delayed(Duration(milliseconds: 500), (){
-                      Navigator.pop(context);
-                    });
                     setState(() {
-                      _selectedDateTime = _selectedDateTime.add(Duration(days: -1));
+                      selectedDateTime = selectedDateTime.add(Duration(days: -1));
+                      _getMortalitiesSelectedDate();
                     });
+
+                    Navigator.pop(context);
                   },
                 ),
               )
@@ -144,18 +169,18 @@ class _MortalityHomeScreenState extends State<MortalityHomeScreen> {
                           if(date != null){
                             Dialogs.waitingDialog(context, "Fetching...", "Please Wait", false);
 
-                            Future.delayed(Duration(milliseconds: 500), (){
-                              Navigator.pop(context);
-                            });
                             setState((){
-                              _selectedDateTime = date;
+                              selectedDateTime = date;
+                              _getMortalitiesSelectedDate();
                             });
+
+                            Navigator.pop(context);
                           }
                         });
                       },
                       title: Center(
                         child: Text(
-                          DateFormat('dd MMMM yyyy').format(_selectedDateTime),
+                          DateFormat('dd MMMM yyyy').format(selectedDateTime),
                         ),
                       )
                     )
@@ -184,12 +209,12 @@ class _MortalityHomeScreenState extends State<MortalityHomeScreen> {
                 onPressed: (){
                   Dialogs.waitingDialog(context, "Fetching...", "Please Wait", false);
 
-                  Future.delayed(Duration(milliseconds: 500), (){
-                    Navigator.pop(context);
-                  });
                   setState(() {
-                    _selectedDateTime = _selectedDateTime.add(Duration(days: 1));
+                    selectedDateTime = selectedDateTime.add(Duration(days: 1));
+                    _getMortalitiesSelectedDate();
                   });
+
+                  Navigator.pop(context);
                 },
               ),
             ),
@@ -198,9 +223,9 @@ class _MortalityHomeScreenState extends State<MortalityHomeScreen> {
       ),
     );
   }
-  
+
   _buildMortalityInspectionCards(){
-    if(farmSiteLoaded == false){
+    if(mortalityLoaded == false){
       return Container(
         margin: EdgeInsets.only(top: 25),
         child: SpinKitThreeBounce(
@@ -208,7 +233,7 @@ class _MortalityHomeScreenState extends State<MortalityHomeScreen> {
             size: 30
         ),
       );
-    } else if(farmSiteLoaded == true){
+    } else if(mortalityLoaded == true){
       if(mortalityInspectionList.length == 0){
         return Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -225,26 +250,36 @@ class _MortalityHomeScreenState extends State<MortalityHomeScreen> {
               itemCount: mortalityInspectionList.length,
               itemBuilder: (BuildContext context, int index){
                 Map dailyObserve = mortalityInspectionList[index];
-                return Padding(
-                  padding: EdgeInsets.fromLTRB(20, 0, 20, 10),
-                  child: Card(
-                    elevation: 1.5,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(15),
-                    ),
-                    child: ListTile(
-                      contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-                      onTap: () async {
-                        Navigator.pushNamed(context, "/dailyobservemortalityneweditscreen", arguments: {
-                          'observationId': dailyObserve['_observed_mortality_id'],
-                          'amountCulling': dailyObserve['observed_mortality_animals_selection'],
-                          'amountDeath': dailyObserve['observed_mortality_animals_dead'],
-                          'inputRemark': dailyObserve['observed_mortality_remark'],
-                          'inspectionRound': mortalityInspectionList.length,
-                          'selectedDateTime' : _selectedDateTime
-                        }).then((reload) => _getFarmSiteInformation());
-                      },
-                      title: GestureDetector(
+                return Dismissible(
+                  key: Key(dailyObserve['_observed_mortality_id']),
+                  onDismissed: (direction) async {
+
+                    String url = "mortality/delete";
+
+                    Map<String, dynamic> params = {
+                      "mortality_id": dailyObserve['_observed_mortality_id'],
+                      "user_name" : user['user_name']
+                    };
+
+                    dynamic responseJSON = await postData(params, url);
+
+                    int deletedCount = await DatabaseHelper.instance.deleteWhere('observed_mortality', ['_observed_mortality_id'], [dailyObserve['_observed_mortality_id']]);
+                    print(deletedCount);
+
+                    setState(() {
+                      mortalityInspectionList.removeAt(index);
+                    });
+                  },
+                  background: Container(color: Colors.white),
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(20, 0, 20, 10),
+                    child: Card(
+                      elevation: 1.5,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      child: ListTile(
+                        contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 15),
                         onTap: () async {
                           Navigator.pushNamed(context, "/dailyobservemortalityneweditscreen", arguments: {
                             'observationId': dailyObserve['_observed_mortality_id'],
@@ -252,65 +287,77 @@ class _MortalityHomeScreenState extends State<MortalityHomeScreen> {
                             'amountDeath': dailyObserve['observed_mortality_animals_dead'],
                             'inputRemark': dailyObserve['observed_mortality_remark'],
                             'inspectionRound': mortalityInspectionList.length,
-                            'selectedDateTime' : _selectedDateTime
+                            'selectedDateTime' : DateTime.parse(dailyObserve['observed_mortality_measurement_date'])
                           }).then((reload) => _getFarmSiteInformation());
                         },
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: <Widget>[
-                            Text(
-                              "Inspection Round : ${dailyObserve['observed_mortality_observation_nr']}",
-                              style: TextStyle(
-                                  color: Colors.black,
-                                  fontFamily: "Montserrat",
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600
+                        title: GestureDetector(
+                          onTap: () async {
+                            Navigator.pushNamed(context, "/dailyobservemortalityneweditscreen", arguments: {
+                              'observationId': dailyObserve['_observed_mortality_id'],
+                              'amountCulling': dailyObserve['observed_mortality_animals_selection'],
+                              'amountDeath': dailyObserve['observed_mortality_animals_dead'],
+                              'inputRemark': dailyObserve['observed_mortality_remark'],
+                              'inspectionRound': mortalityInspectionList.length,
+                              'selectedDateTime' : DateTime.parse(dailyObserve['observed_mortality_measurement_date'])
+                            }).then((reload) => _getFarmSiteInformation());
+                          },
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: <Widget>[
+                              Text(
+                                "Inspection Round : ${dailyObserve['observed_mortality_observation_nr']}",
+                                style: TextStyle(
+                                    color: Colors.black,
+                                    fontFamily: "Montserrat",
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600
+                                ),
                               ),
-                            ),
-                            Container(
-                              height: 0.25,
-                              margin: EdgeInsets.symmetric(vertical: 10),
-                              color: Colors.grey,
-                            ),
-                            Container(
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: <Widget>[
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: <Widget>[
-                                      Text(
-                                          "Culling : ${dailyObserve['observed_mortality_animals_selection']}",
-                                          style: TextStyle(
-                                              color: Colors.black,
-                                              fontFamily: "Montserrat",
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w400
-                                          )
-                                      ),
-                                    ],
-                                  ),
-                                  SizedBox(
-                                    width: MediaQuery.of(context).size.width / 30,
-                                  ),
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: <Widget>[
-                                      Text(
-                                          "Death : ${dailyObserve['observed_mortality_animals_dead']}",
-                                          style: TextStyle(
-                                              color: Colors.black,
-                                              fontFamily: "Montserrat",
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w400
-                                          )
-                                      ),
-                                    ],
-                                  ),
-                                ],
+                              Container(
+                                height: 0.25,
+                                margin: EdgeInsets.symmetric(vertical: 10),
+                                color: Colors.grey,
                               ),
-                            ),
-                          ],
+                              Container(
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: <Widget>[
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: <Widget>[
+                                        Text(
+                                            "Culling : ${dailyObserve['observed_mortality_animals_selection']}",
+                                            style: TextStyle(
+                                                color: Colors.black,
+                                                fontFamily: "Montserrat",
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w400
+                                            )
+                                        ),
+                                      ],
+                                    ),
+                                    SizedBox(
+                                      width: MediaQuery.of(context).size.width / 30,
+                                    ),
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: <Widget>[
+                                        Text(
+                                            "Death : ${dailyObserve['observed_mortality_animals_dead']}",
+                                            style: TextStyle(
+                                                color: Colors.black,
+                                                fontFamily: "Montserrat",
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w400
+                                            )
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
@@ -342,7 +389,7 @@ class _MortalityHomeScreenState extends State<MortalityHomeScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
                     Text(
-                      "House : " + user['_location_id'].toString(),
+                      "House : " + user['_animal_location_id'].toString(),
                       style: TextStyle(
                           color: Colors.black,
                           fontFamily: "Montserrat",
@@ -448,7 +495,7 @@ class _MortalityHomeScreenState extends State<MortalityHomeScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            HomeScreenHeader(),
+            ObservationScreenHeader(),
             Expanded(
               child: Container(
 //                padding: EdgeInsets.symmetric(horizontal: 20),
@@ -466,26 +513,26 @@ class _MortalityHomeScreenState extends State<MortalityHomeScreen> {
                   ),
                   child: Column(
                     children: <Widget>[
+//                      Row(
+//                        children: <Widget>[
+//                          Container(
+//                            padding: EdgeInsets.fromLTRB(30, 20, 30, 5),
+//                            child: Text(
+//                              "Daily Observations",
+//                              style: TextStyle(
+//                                  fontFamily: "Montserrat",
+//                                  fontSize: 20,
+//                                  fontWeight: FontWeight.bold
+//                              ),
+//                            ),
+//                          ),
+//                        ],
+//                      ),
+//                      _buildHouseInformationCard(),
                       Row(
                         children: <Widget>[
                           Container(
-                            padding: EdgeInsets.fromLTRB(30, 20, 30, 5),
-                            child: Text(
-                              "Daily Observations",
-                              style: TextStyle(
-                                  fontFamily: "Montserrat",
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      _buildHouseInformationCard(),
-                      Row(
-                        children: <Widget>[
-                          Container(
-                            padding: EdgeInsets.fromLTRB(30, 5, 30, 0),
+                            padding: EdgeInsets.fromLTRB(30, 20, 30, 0),
                             child: Text(
                               "Mortality",
                               style: TextStyle(
@@ -507,7 +554,7 @@ class _MortalityHomeScreenState extends State<MortalityHomeScreen> {
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: mortalityLoaded == true && mortalityInspectionList.length < 2 ? FloatingActionButton(
         child: Icon(Icons.add),
         backgroundColor: Color.fromRGBO(253, 184, 19, 1),
         focusColor: Colors.white,
@@ -515,13 +562,13 @@ class _MortalityHomeScreenState extends State<MortalityHomeScreen> {
           if(mortalityInspectionList.length < 2){
             Navigator.pushNamed(context, "/dailyobservemortalityneweditscreen", arguments: {
               'inspectionRound': mortalityInspectionList.length + 1,
-              'selectedDateTime' : _selectedDateTime
+              'selectedDateTime' : selectedDateTime
             }).then((reload) => _getFarmSiteInformation());
           } else {
             await Dialogs.errorRetryDialog(context, "Inspection round has reached the limit", "Close", true);
           }
         },
-      ),
+      ) : null,
     );
   }
 }

@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:intl/intl.dart';
 import 'package:poultryresult/Services/database_helper.dart';
+import 'package:poultryresult/Services/globalidentifier_generator.dart';
+import 'package:poultryresult/Services/rest_api.dart';
 import 'package:poultryresult/Widgets/dialogs.dart';
 import 'package:poultryresult/Widgets/homescreenappbar.dart';
 import 'package:poultryresult/Widgets/homescreenheader.dart';
 import 'package:poultryresult/Widgets/Sidebar_Main.dart';
+import 'package:poultryresult/Widgets/observationscreenheader.dart';
 
 class FeedHomeScreen extends StatefulWidget {
   @override
@@ -14,28 +17,15 @@ class FeedHomeScreen extends StatefulWidget {
 
 class _FeedHomeScreenState extends State<FeedHomeScreen> {
 
-  List<Map> feedInspectionList = [
-    {
-      "feed_batch": 1,
-      "feed_storage": 1,
-      "feed_kind": "Feed 1",
-      "feed_amount": 10
-    },
-    {
-      "feed_batch": 2,
-      "feed_storage": 1,
-      "feed_kind": "Feed 2",
-      "feed_amount": 20
-    },
-  ];
-
   Map<String, dynamic> user;
   Map<String, dynamic> farm_site;
   Map<String, dynamic> management_location;
+  List<Map<String, dynamic>> inputUsesInspectionList;
 
   bool farmSiteLoaded = false;
+  bool inputUsesLoaded = false;
 
-  DateTime _selectedDateTime = DateTime.now();
+  DateTime selectedDateTime = DateTime.now();
 
   @override
   void initState() {
@@ -47,13 +37,16 @@ class _FeedHomeScreenState extends State<FeedHomeScreen> {
 
   _getFarmSiteInformation() async {
     List<Map<String, dynamic>> users = await DatabaseHelper.instance.get('user');
-    List<Map<String, dynamic>> farm_sites = await DatabaseHelper.instance.getById('farm_sites', users[0]['_farm_sites_id']);
+    List<Map<String, dynamic>> farm_sites = await DatabaseHelper.instance.getWhere('farm_sites', ['_farm_sites_id'], [users[0]['_farm_sites_id']]);
 
-    List<Map<String, dynamic>> management_locations = await DatabaseHelper.instance.getById('management_location', users[0]['_management_location_id']);
-    List<Map<String, dynamic>> locations = await DatabaseHelper.instance.getById('location', management_locations[0]['management_location_location_id']);
+    List<Map<String, dynamic>> management_locations = await DatabaseHelper.instance.getWhere('management_location', ['_management_location_id'], [users[0]['_management_location_id']]);
+
+    List<Map<String, dynamic>> animal_locations = await DatabaseHelper.instance.getWhere('animal_location', ['_animal_location_id'], [management_locations[0]['management_location_animal_location_id']]);
     List<Map<String, dynamic>> rounds = await DatabaseHelper.instance.getById('round', management_locations[0]['management_location_round_id']);
 
-    List<Map<String, dynamic>> observedanimalcounts = await DatabaseHelper.instance.getByReference('observed_animal_count', 'management_location', 'observed_animal_counts_aln_id', management_locations[0]['_management_location_id']);
+    List<Map<String, dynamic>> observedanimalcounts = await DatabaseHelper.instance.getWhere(
+        'observed_animal_count', ['observed_animal_counts_mln_id'], [management_locations[0]['_management_location_id']]
+    );
 
     int animal_count = 0;
 
@@ -66,18 +59,81 @@ class _FeedHomeScreenState extends State<FeedHomeScreen> {
     new_management_location = {
       ...management_locations[0],
       'animal_count' : animal_count,
-      'location' : locations[0],
+      'location' : animal_locations[0],
       'round' : rounds[0],
 
     };
-
-    print(new_management_location);
 
     setState(() {
       user = users[0];
       farm_site = farm_sites[0];
       management_location = new_management_location;
       farmSiteLoaded = true;
+    });
+
+
+    _getFeedSelectedDate();
+  }
+
+  _getFeedSelectedDate() async {
+    setState(() {
+      inputUsesLoaded = false;
+    });
+
+    List<Map<String, dynamic>> observedInputUses = List<Map<String, dynamic>>();
+
+    List<Map<String, dynamic>> observedInputUsesFromDB = await DatabaseHelper.instance.getWhere(
+        'observed_input_uses',
+        [
+          'observed_input_uses_mln_id',
+          'observed_input_uses_measurement_date',
+          'observed_input_uses_oue_type'
+        ],
+        [
+          management_location['_management_location_id'],
+          DateFormat('yyyy-MM-dd').format(selectedDateTime),
+          'Feed'
+        ]
+    );
+
+    observedInputUsesFromDB.forEach((oiu) async {
+      Map<String, dynamic> observedInputUse = Map<String, dynamic>();
+      List<Map<String, dynamic>> observedInputTypes = List<Map<String, dynamic>>();
+      List<Map<String, dynamic>> observedInputTypesFromDB = await DatabaseHelper.instance.getWhere(
+          'observed_input_types', ['observed_input_types_oue_id'], [oiu['_observed_input_uses_id']]
+      );
+
+      observedInputTypesFromDB.forEach((oit) async {
+        Map<String, dynamic> observedInputType = Map<String, dynamic>();
+        Map<String, dynamic> inputType = Map<String, dynamic>();
+        List<Map<String, dynamic>> inputTypesFromDB = await DatabaseHelper.instance.getById('input_types', oit['observed_input_types_ite_id']);
+
+        inputType = inputTypesFromDB[0];
+
+        observedInputType = {
+          ...oit,
+          'input_type' : inputType
+        };
+
+        observedInputTypes.add(observedInputType);
+
+        observedInputUse = {
+          ...oiu,
+          'observed_input_types' : observedInputTypes
+        };
+
+        observedInputUses.add(observedInputUse);
+
+//        print(observedInputUses);
+
+      });
+    });
+
+    Future.delayed(Duration(milliseconds: 250), (){
+      setState(() {
+        inputUsesInspectionList = observedInputUses;
+        inputUsesLoaded = true;
+      });
     });
   }
 
@@ -99,7 +155,7 @@ class _FeedHomeScreenState extends State<FeedHomeScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
                     Text(
-                      "House : " + user['_location_id'].toString(),
+                      "House : " + user['_animal_location_id'].toString(),
                       style: TextStyle(
                           color: Colors.black,
                           fontFamily: "Montserrat",
@@ -195,7 +251,8 @@ class _FeedHomeScreenState extends State<FeedHomeScreen> {
   _buildFeedDateSelector(){
     return Container(
       height: 57.5,
-      margin: EdgeInsets.symmetric(horizontal: 25, vertical: 10),
+//      margin: EdgeInsets.symmetric(horizontal: 25, vertical: 10),
+      margin: EdgeInsets.symmetric(horizontal: 25, vertical: MediaQuery.of(context).size.height / 100),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: <Widget>[
@@ -221,12 +278,12 @@ class _FeedHomeScreenState extends State<FeedHomeScreen> {
                   onPressed: () async {
                     Dialogs.waitingDialog(context, "Fetching...", "Please Wait", false);
 
-                    Future.delayed(Duration(milliseconds: 500), (){
-                      Navigator.pop(context);
-                    });
                     setState(() {
-                      _selectedDateTime = _selectedDateTime.add(Duration(days: -1));
+                      selectedDateTime = selectedDateTime.add(Duration(days: -1));
+                      _getFeedSelectedDate();
                     });
+
+                    Navigator.pop(context);
                   },
                 ),
               )
@@ -251,18 +308,18 @@ class _FeedHomeScreenState extends State<FeedHomeScreen> {
                             if(date != null){
                               Dialogs.waitingDialog(context, "Fetching...", "Please Wait", false);
 
-                              Future.delayed(Duration(milliseconds: 500), (){
-                                Navigator.pop(context);
-                              });
                               setState((){
-                                _selectedDateTime = date;
+                                selectedDateTime = date;
+                                _getFeedSelectedDate();
                               });
+
+                              Navigator.pop(context);
                             }
                           });
                         },
                         title: Center(
                           child: Text(
-                            DateFormat('dd MMMM yyyy').format(_selectedDateTime),
+                            DateFormat('dd MMMM yyyy').format(selectedDateTime),
                           ),
                         )
                     )
@@ -291,12 +348,12 @@ class _FeedHomeScreenState extends State<FeedHomeScreen> {
                 onPressed: (){
                   Dialogs.waitingDialog(context, "Fetching...", "Please Wait", false);
 
-                  Future.delayed(Duration(milliseconds: 500), (){
-                    Navigator.pop(context);
-                  });
                   setState(() {
-                    _selectedDateTime = _selectedDateTime.add(Duration(days: 1));
+                    selectedDateTime = selectedDateTime.add(Duration(days: 1));
+                    _getFeedSelectedDate();
                   });
+
+                  Navigator.pop(context);
                 },
               ),
             ),
@@ -307,157 +364,375 @@ class _FeedHomeScreenState extends State<FeedHomeScreen> {
   }
 
   _buildFeedCopyPrevious(){
-    return Container(
-      height: 57.5,
-      margin: EdgeInsets.symmetric(horizontal: 25, vertical: 10),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: <Widget>[
-          Flexible(
-              flex: 1,
-              child: Container(
-                child: Card(
-                    elevation: 2,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(15),
-                    ),
-                    child: ListTile(
-                        onTap: (){
-                          print("Tapped Copy Previous");
-                        },
-                        title: Center(
-                          child: Text(
-                            "Copy Previous",
-                            style: TextStyle(
-                                color: Colors.black,
-                                fontFamily: "Montserrat",
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600
+    if(inputUsesLoaded == true && inputUsesInspectionList.length < 1){
+      return Container(
+        height: 57.5,
+//      margin: EdgeInsets.symmetric(horizontal: 25, vertical: 10),
+        margin: EdgeInsets.symmetric(horizontal: 25, vertical: MediaQuery.of(context).size.height / 100),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: <Widget>[
+            Flexible(
+                flex: 1,
+                child: Container(
+                  child: Card(
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      child: ListTile(
+                          onTap: (){
+                            _getPreviousObservation();
+                          },
+                          title: Center(
+                            child: Text(
+                              "Copy Previous",
+                              style: TextStyle(
+                                  color: Colors.black,
+                                  fontFamily: "Montserrat",
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600
+                              ),
                             ),
-                          ),
-                        )
-                    )
-                ),
-              )
-          ),
-        ],
-      ),
-    );
+                          )
+                      )
+                  ),
+                )
+            ),
+          ],
+        ),
+      );
+    } else {
+      return Container();
+    }
+
+
   }
 
   _buildFeedInspectionCards(){
-    return Expanded(
-      child: Container(
-        child: ListView.builder(
-          itemCount: feedInspectionList.length,
-          itemBuilder: (BuildContext context, int index){
-            Map dailyObserve = feedInspectionList[index];
-            return Padding(
-              padding: EdgeInsets.fromLTRB(20, 0, 20, 10),
-              child: Card(
-                elevation: 1.5,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                child: ListTile(
-                  contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-                  onTap: (){
-                    Navigator.pushNamed(context, "/dailyobservefeedneweditscreen");
+    if(inputUsesLoaded == false){
+      return Container(
+        margin: EdgeInsets.only(top: 25),
+        child: SpinKitThreeBounce(
+            color: Color.fromRGBO(253, 184, 19, 1),
+            size: 30
+        ),
+      );
+    } else if(inputUsesLoaded == true){
+      if(inputUsesInspectionList.length == 0){
+        return Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: <Widget>[
+            Container(
+                margin: EdgeInsets.only(top: 25),
+                child: Text("No data found")),
+          ],
+        );
+      } else if(inputUsesInspectionList.length > 0){
+        return Expanded(
+          child: Container(
+            child: ListView.builder(
+              itemCount: inputUsesInspectionList.length,
+              itemBuilder: (BuildContext context, int index){
+                Map dailyObserve = inputUsesInspectionList[index];
+                return Dismissible(
+                  key: Key(dailyObserve['_observed_input_uses_id']),
+                  onDismissed: (direction) async {
+
+                    String url = "observedinputuses/delete";
+
+                    Map<String, dynamic> params = {
+                      "observed_input_use_id": dailyObserve['_observed_input_uses_id'],
+                      "user_name" : user['user_name']
+                    };
+
+                    dynamic responseJSON = await postData(params, url);
+
+                    dailyObserve['observed_input_types'].forEach((element) async {
+                      await DatabaseHelper.instance.deleteWhere('observed_input_types', ['_observed_input_types_id'], [element['_observed_input_types_id']]);
+                    });
+
+                    int deletedCount = await DatabaseHelper.instance.deleteWhere('observed_input_uses', ['_observed_input_uses_id'], [dailyObserve['_observed_input_uses_id']]);
+                    print(deletedCount);
+
+                    setState(() {
+                      inputUsesInspectionList.removeAt(index);
+                    });
                   },
-                  title: GestureDetector(
-                    onTap: (){
-                      Navigator.pushNamed(context, "/dailyobservefeedneweditscreen");
-                    },
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        Text(
-                          "Batch : ${dailyObserve['feed_batch']}",
-                          style: TextStyle(
-                              color: Colors.black,
-                              fontFamily: "Montserrat",
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600
-                          ),
-                        ),
-                        Container(
-                          height: 0.25,
-                          margin: EdgeInsets.symmetric(vertical: 10),
-                          color: Colors.grey,
-                        ),
-                        Container(
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  background: Container(color: Colors.white),
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(20, 0, 20, 10),
+                    child: Card(
+                      elevation: 1.5,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      child: ListTile(
+                        contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                        onTap: (){
+                          Navigator.pushNamed(context, "/dailyobservefeedneweditscreen", arguments: {
+                            'observedInputUsesId' : dailyObserve['_observed_input_uses_id'],
+                            'observedInputTypesId' : dailyObserve['observed_input_types'][0]['_observed_input_types_id'],
+                            'inspectionRound': dailyObserve['observed_input_uses_treatment_nr'],
+                            'selectedDateTime' : selectedDateTime,
+                            'feedAmount' : dailyObserve['observed_input_uses_total_amount'],
+                            'selectedInputType': dailyObserve['observed_input_types'][0]['input_type']
+                          }).then((reload) => _getFarmSiteInformation());
+                        },
+                        title: GestureDetector(
+                          onTap: (){
+                            Navigator.pushNamed(context, "/dailyobservefeedneweditscreen", arguments: {
+                              'observedInputUsesId' : dailyObserve['_observed_input_uses_id'],
+                              'observedInputTypesId' : dailyObserve['observed_input_types'][0]['_observed_input_types_id'],
+                              'inspectionRound': dailyObserve['observed_input_uses_treatment_nr'],
+                              'selectedDateTime' : selectedDateTime,
+                              'feedAmount' : dailyObserve['observed_input_uses_total_amount'],
+                              'selectedInputType': dailyObserve['observed_input_types'][0]['input_type']
+                            }).then((reload) => _getFarmSiteInformation());
+                          },
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: <Widget>[
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: <Widget>[
-                                  Text(
-                                      "Storage : ${dailyObserve['feed_storage']}",
-                                      style: TextStyle(
-                                          color: Colors.black,
-                                          fontFamily: "Montserrat",
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w400
-                                      )
-                                  ),
-                                  SizedBox(
-                                    height: 5,
-                                  ),
-                                  Text(
-                                      "Amount : ${dailyObserve['feed_amount']}",
-                                      style: TextStyle(
-                                          color: Colors.black,
-                                          fontFamily: "Montserrat",
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w400
-                                      )
-                                  )
-                                ],
+                              Text(
+                                "Treatment : " + dailyObserve['observed_input_uses_treatment_nr'].toString(),
+                                style: TextStyle(
+                                    color: Colors.black,
+                                    fontFamily: "Montserrat",
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600
+                                ),
                               ),
-                              SizedBox(
-                                width: MediaQuery.of(context).size.width / 30,
+                              Container(
+                                height: 0.25,
+                                margin: EdgeInsets.symmetric(vertical: 10),
+                                color: Colors.grey,
                               ),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: <Widget>[
-                                  Text(
-                                      "Kind of Feed :",
-                                      style: TextStyle(
-                                          color: Colors.black,
-                                          fontFamily: "Montserrat",
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w400
-                                      )
-                                  ),
-                                  SizedBox(
-                                    height: 5,
-                                  ),
-                                  Text(
-                                      "${dailyObserve['feed_kind']}",
-                                      style: TextStyle(
-                                          color: Colors.black,
-                                          fontFamily: "Montserrat",
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w400
-                                      )
-                                  )
-                                ],
+                              Container(
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: <Widget>[
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: <Widget>[
+                                        Text(
+                                            dailyObserve['observed_input_types'].length > 0 ?
+                                            "Feed : " + dailyObserve['observed_input_types'][0]['input_type']['input_types_code'] :
+                                            "Feed : empty",
+                                            style: TextStyle(
+                                                color: Colors.black,
+                                                fontFamily: "Montserrat",
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w400
+                                            )
+                                        ),
+                                        SizedBox(
+                                          height: 5,
+                                        ),
+                                        Text(
+                                            "Amount : " + dailyObserve['observed_input_uses_total_amount'].toString(),
+                                            style: TextStyle(
+                                                color: Colors.black,
+                                                fontFamily: "Montserrat",
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w400
+                                            )
+                                        )
+                                      ],
+                                    ),
+                                    SizedBox(
+                                      width: MediaQuery.of(context).size.width / 30,
+                                    ),
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: <Widget>[
+                                        Text(
+                                            "Measurement :",
+                                            style: TextStyle(
+                                                color: Colors.black,
+                                                fontFamily: "Montserrat",
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w400
+                                            )
+                                        ),
+                                        SizedBox(
+                                          height: 5,
+                                        ),
+                                        Text(
+                                            dailyObserve['observed_input_uses_unit'] != null ?
+                                            dailyObserve['observed_input_uses_unit'] :
+                                            dailyObserve['observed_input_types'][0]['input_type']['input_types_uom'],
+                                            style: TextStyle(
+                                                color: Colors.black,
+                                                fontFamily: "Montserrat",
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w400
+                                            )
+                                        )
+                                      ],
+                                    ),
+                                  ],
+                                ),
                               ),
                             ],
                           ),
                         ),
-                      ],
+                      ),
                     ),
                   ),
-                ),
-              ),
-            );
-          },
-        ),
-      ),
-    );
+                );
+              },
+            ),
+          ),
+        );
+      }
+    }
   }
+
+  _getPreviousObservation() async {
+
+    Dialogs.waitingDialog(context, "Fetching...", "Please Wait", false);
+
+    int treatment_nr = 0;
+    List<Map<String, dynamic>> observedInputUses = List<Map<String, dynamic>>();
+
+    List<Map<String, dynamic>> observedInputUsesFromDB = await DatabaseHelper.instance.getWhere(
+        'observed_input_uses',
+        [
+          'observed_input_uses_mln_id',
+          'observed_input_uses_measurement_date',
+          'observed_input_uses_oue_type'
+        ],
+        [
+          management_location['_management_location_id'],
+          DateFormat('yyyy-MM-dd').format(selectedDateTime.add(Duration(days: -1))),
+          'Feed'
+        ]
+    );
+
+//    List<Map<String, dynamic>> observed_input_uses = await DatabaseHelper.instance.get('observed_input_uses');
+//    int new_observed_input_uses_id = observed_input_uses[observed_input_uses.length - 1]['_observed_input_uses_id'];
+
+//    List<Map<String, dynamic>> observed_input_types = await DatabaseHelper.instance.get('observed_input_types');
+//    int new_observed_input_types_id = observed_input_types[observed_input_types.length - 1]['_observed_input_types_id'];
+
+
+//    print(observedInputUsesFromDB);
+
+    observedInputUsesFromDB.forEach((oiu) async {
+      Map<String, dynamic> observedInputUse = Map<String, dynamic>();
+      List<Map<String, dynamic>> observedInputTypes = List<Map<String, dynamic>>();
+
+      List<Map<String, dynamic>> observedInputTypesFromDB = await DatabaseHelper.instance.getWhere(
+          'observed_input_types', ['observed_input_types_oue_id'], [oiu['_observed_input_uses_id']]
+      );
+
+      observedInputTypesFromDB.forEach((oit) async {
+        Map<String, dynamic> observedInputType = Map<String, dynamic>();
+        Map<String, dynamic> inputType = Map<String, dynamic>();
+        List<Map<String, dynamic>> inputTypesFromDB = await DatabaseHelper.instance.getById('input_types', oit['observed_input_types_ite_id']);
+
+        inputType = inputTypesFromDB[0];
+
+        observedInputType = {
+          ...oit,
+          'input_type' : inputType
+        };
+
+        observedInputTypes.add(observedInputType);
+
+        observedInputUse = {
+          ...oiu,
+          'observed_input_types' : observedInputTypes
+        };
+
+        // ----------------------------------------------------------------------
+
+        String management_location_id = management_location['_management_location_id'];
+        String measurement_date = DateFormat('yyyy-MM-dd').format(selectedDateTime);
+        String creation_date = DateFormat("yyyy-MM-dd HH:mm:ss").format(DateTime.now());
+        treatment_nr = treatment_nr + 1;
+        int feed_amount = oit['observed_input_types_amount'];
+        String oue_type = "Feed";
+        String input_types_id = inputType['_input_types_id'].toString();
+        String unit_of_measurement = inputType['input_types_uom'];
+        String user_name =  user['user_name'];
+
+//        observedInputUses.add(observedInputUse);
+
+//        print("management_location_id "+ management_location_id.toString());
+//        print("measurement_date "+ measurement_date);
+//        print("creation_date "+creation_date);
+//        print("treatment_nr "+ treatment_nr.toString());
+//        print("feed_amount "+ feed_amount.toString());
+//        print("oue_type "+ oue_type);
+//        print("input_types_id "+ input_types_id.toString());
+//        print("unit_of_measurement "+unit_of_measurement);
+//        print("user_name "+ user_name);
+//        print("----------------------------------------------------------------------");
+
+        String new_observed_input_uses_id = generate_GlobalIdentifier();
+        String new_observed_input_types_id = generate_GlobalIdentifier();
+
+        int inserted_observed_input_uses_id = await DatabaseHelper.instance.insert('observed_input_uses', {
+          DatabaseHelper.observed_input_uses_id: new_observed_input_uses_id,
+          DatabaseHelper.observed_input_uses_mln_id: management_location_id,
+          DatabaseHelper.observed_input_uses_oue_type : oue_type,
+          DatabaseHelper.observed_input_uses_measurement_date: measurement_date,
+          DatabaseHelper.observed_input_uses_treatment_nr : treatment_nr,
+          DatabaseHelper.observed_input_uses_total_amount : feed_amount,
+          DatabaseHelper.observed_input_uses_unit : unit_of_measurement,
+          DatabaseHelper.observed_input_uses_creation_date: creation_date,
+          DatabaseHelper.observed_input_uses_mutation_date : creation_date,
+          DatabaseHelper.observed_input_uses_observed_by : user_name,
+        });
+
+        await DatabaseHelper.instance.insert('observed_input_types', {
+          DatabaseHelper.observed_input_types_id: new_observed_input_types_id,
+          DatabaseHelper.observed_input_types_ite_id: input_types_id,
+          DatabaseHelper.observed_input_types_oue_id : new_observed_input_uses_id,
+          DatabaseHelper.observed_input_types_amount: feed_amount,
+          DatabaseHelper.observed_input_types_creation_date : creation_date,
+          DatabaseHelper.observed_input_types_mutation_date : creation_date
+        });
+
+        String url = "observedinputuses/insert";
+
+        Map<String, dynamic> params = {
+          "observed_input_use_id": new_observed_input_uses_id,
+          "management_location_id": management_location_id,
+          "oue_type" : oue_type,
+          "measurement_date" : measurement_date,
+          "total_amount": feed_amount,
+          "unit": unit_of_measurement,
+          "user_name": user_name
+        };
+
+        dynamic responseJSON = await postData(params, url);
+
+        if(responseJSON['status'] == 'Success') {
+          String url = "observedinputtypes/insert";
+
+          Map<String, dynamic> params = {
+            "observed_input_type_id": new_observed_input_types_id,
+            "amount": feed_amount,
+            "observed_input_uses_id": new_observed_input_uses_id,
+            "input_type_id": input_types_id,
+          };
+
+          dynamic responseJSON = await postData(params, url);
+        };
+
+
+      });
+
+    });
+
+    Future.delayed(Duration(seconds: 2), (){
+      Navigator.pop(context);
+      _getFeedSelectedDate();
+    });
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -471,7 +746,7 @@ class _FeedHomeScreenState extends State<FeedHomeScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            HomeScreenHeader(),
+            ObservationScreenHeader(),
             Expanded(
               child: Container(
 //                padding: EdgeInsets.symmetric(horizontal: 20),
@@ -505,26 +780,26 @@ class _FeedHomeScreenState extends State<FeedHomeScreen> {
                             ),
                             child: Column(
                               children: <Widget>[
+//                                Row(
+//                                  children: <Widget>[
+//                                    Container(
+//                                      padding: EdgeInsets.fromLTRB(30, 20, 30, 5),
+//                                      child: Text(
+//                                        "Daily Observations",
+//                                        style: TextStyle(
+//                                            fontFamily: "Montserrat",
+//                                            fontSize: 20,
+//                                            fontWeight: FontWeight.bold
+//                                        ),
+//                                      ),
+//                                    ),
+//                                  ],
+//                                ),
+//                                _buildHouseInformationCard(),
                                 Row(
                                   children: <Widget>[
                                     Container(
-                                      padding: EdgeInsets.fromLTRB(30, 20, 30, 5),
-                                      child: Text(
-                                        "Daily Observations",
-                                        style: TextStyle(
-                                            fontFamily: "Montserrat",
-                                            fontSize: 20,
-                                            fontWeight: FontWeight.bold
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                _buildHouseInformationCard(),
-                                Row(
-                                  children: <Widget>[
-                                    Container(
-                                      padding: EdgeInsets.fromLTRB(30, 5, 30, 0),
+                                      padding: EdgeInsets.fromLTRB(30, 20, 30, 0),
                                       child: Text(
                                         "Feed",
                                         style: TextStyle(
@@ -556,8 +831,11 @@ class _FeedHomeScreenState extends State<FeedHomeScreen> {
         child: Icon(Icons.add),
         backgroundColor: Color.fromRGBO(253, 184, 19, 1),
         focusColor: Colors.white,
-        onPressed: (){
-          Navigator.pushNamed(context, "/dailyobservefeedneweditscreen");
+        onPressed: ()async{
+          Navigator.pushNamed(context, "/dailyobservefeedneweditscreen", arguments: {
+            'inspectionRound': inputUsesInspectionList.length + 1,
+            'selectedDateTime' : selectedDateTime,
+          }).then((reload) => _getFarmSiteInformation());
         },
       ),
     );

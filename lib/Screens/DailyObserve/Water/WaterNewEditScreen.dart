@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:intl/intl.dart';
 import 'package:poultryresult/Services/database_helper.dart';
+import 'package:poultryresult/Services/globalidentifier_generator.dart';
 import 'package:poultryresult/Services/rest_api.dart';
 import 'package:poultryresult/Widgets/Sidebar_Main.dart';
 import 'package:poultryresult/Widgets/dialogs.dart';
 import 'package:poultryresult/Widgets/homescreenappbar.dart';
 import 'package:poultryresult/Widgets/homescreenheader.dart';
+import 'package:poultryresult/Widgets/observationscreenheader.dart';
 import 'package:sqflite/sqflite.dart';
 
 class WaterNewEditScreen extends StatefulWidget {
@@ -19,7 +21,7 @@ class _WaterNewEditScreenState extends State<WaterNewEditScreen> {
   bool isNew;
 
   DateTime selectedDateTime;
-  int observationId;
+  String observationId;
   int amountWater;
 
   Map<String, dynamic> routeData = {};
@@ -45,13 +47,16 @@ class _WaterNewEditScreenState extends State<WaterNewEditScreen> {
 
   _getFarmSiteInformation() async {
     List<Map<String, dynamic>> users = await DatabaseHelper.instance.get('user');
-    List<Map<String, dynamic>> farm_sites = await DatabaseHelper.instance.getById('farm_sites', users[0]['_farm_sites_id']);
+    List<Map<String, dynamic>> farm_sites = await DatabaseHelper.instance.getWhere('farm_sites', ['_farm_sites_id'], [users[0]['_farm_sites_id']]);
 
-    List<Map<String, dynamic>> management_locations = await DatabaseHelper.instance.getById('management_location', users[0]['_management_location_id']);
-    List<Map<String, dynamic>> locations = await DatabaseHelper.instance.getById('location', management_locations[0]['management_location_location_id']);
+    List<Map<String, dynamic>> management_locations = await DatabaseHelper.instance.getWhere('management_location', ['_management_location_id'], [users[0]['_management_location_id']]);
+
+    List<Map<String, dynamic>> animal_locations = await DatabaseHelper.instance.getWhere('animal_location', ['_animal_location_id'], [management_locations[0]['management_location_animal_location_id']]);
     List<Map<String, dynamic>> rounds = await DatabaseHelper.instance.getById('round', management_locations[0]['management_location_round_id']);
 
-    List<Map<String, dynamic>> observedanimalcounts = await DatabaseHelper.instance.getByReference('observed_animal_count', 'management_location', 'observed_animal_counts_aln_id', management_locations[0]['_management_location_id']);
+    List<Map<String, dynamic>> observedanimalcounts = await DatabaseHelper.instance.getWhere(
+        'observed_animal_count', ['observed_animal_counts_mln_id'], [management_locations[0]['_management_location_id']]
+    );
 
     int animal_count = 0;
 
@@ -64,7 +69,7 @@ class _WaterNewEditScreenState extends State<WaterNewEditScreen> {
     new_management_location = {
       ...management_locations[0],
       'animal_count' : animal_count,
-      'location' : locations[0],
+      'location' : animal_locations[0],
       'round' : rounds[0],
 
     };
@@ -75,6 +80,7 @@ class _WaterNewEditScreenState extends State<WaterNewEditScreen> {
       management_location = new_management_location;
       farmSiteLoaded = true;
     });
+
   }
 
 
@@ -120,7 +126,7 @@ class _WaterNewEditScreenState extends State<WaterNewEditScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: <Widget>[
                                 Text(
-                                    "House : " + user['_location_id'].toString(),
+                                    "House : " + user['_animal_location_id'].toString(),
                                     style: TextStyle(
                                         color: Colors.black,
                                         fontFamily: "Montserrat",
@@ -316,39 +322,34 @@ class _WaterNewEditScreenState extends State<WaterNewEditScreen> {
   formSubmit() async{
     Dialogs.waitingDialog(context, "Submitting...", "Please Wait", false);
 
-    int management_location_id = management_location['_management_location_id'];
-    String uu_id = "fiwnefwnf";
+    String management_location_id = management_location['_management_location_id'];
     String measurement_date = DateFormat('yyyy-MM-dd').format(selectedDateTime);
+    String creation_date = DateFormat("yyyy-MM-dd HH:mm:ss").format(DateTime.now());
     int water_amount = amountWater;
     String water_unit = 'm3';
     String user_name =  user['user_name'];
 
-//    print(isNew);
-//    print(observationId);
-
     if(isNew == true){
-      List<Map<String, dynamic>> water_uses = await DatabaseHelper.instance.get('observed_water_uses');
-      int water_id = water_uses.length > 0 ? water_uses[water_uses.length - 1]['_observed_water_uses_id'] + 1 : 1;
+//      List<Map<String, dynamic>> water_uses = await DatabaseHelper.instance.get('observed_water_uses');
+//      int water_id = water_uses.length > 0 ? water_uses[water_uses.length - 1]['_observed_water_uses_id'] + 1 : 1;
 
-      print(water_id);
-      print(water_amount);
+      String water_id = generate_GlobalIdentifier();
 
       int id = await DatabaseHelper.instance.insert('observed_water_uses', {
         DatabaseHelper.observed_water_uses_id: water_id,
-        DatabaseHelper.observed_water_uses_uu_id: uu_id,
-        DatabaseHelper.observed_water_uses_aln_id: management_location_id,
+        DatabaseHelper.observed_water_uses_mln_id: management_location_id,
         DatabaseHelper.observed_water_uses_measurement_date : measurement_date,
+        DatabaseHelper.observed_water_uses_creation_date : creation_date,
         DatabaseHelper.observed_water_uses_amount : water_amount,
         DatabaseHelper.observed_water_uses_unit : water_unit,
-        DatabaseHelper.observed_water_uses_creation_date : measurement_date,
         DatabaseHelper.observed_water_uses_observed_by : user_name
       });
 
       String url = "water/insert";
 
       Map<String, dynamic> params = {
+        "water_id" : water_id,
         "management_location_id" : management_location_id,
-        "uu_id" : uu_id,
         "measurement_date" : measurement_date,
         "amount": water_amount,
         "unit": water_unit,
@@ -364,11 +365,10 @@ class _WaterNewEditScreenState extends State<WaterNewEditScreen> {
 
 
     } else if(isNew == false){
-      int water_id = observationId;
+      String water_id = observationId;
       await DatabaseHelper.instance.update('observed_water_uses', {
         DatabaseHelper.observed_water_uses_id: water_id,
-        DatabaseHelper.observed_water_uses_uu_id: uu_id,
-        DatabaseHelper.observed_water_uses_aln_id: management_location_id,
+        DatabaseHelper.observed_water_uses_mln_id: management_location_id,
         DatabaseHelper.observed_water_uses_measurement_date : measurement_date,
         DatabaseHelper.observed_water_uses_amount : water_amount,
         DatabaseHelper.observed_water_uses_unit : water_unit,
@@ -379,7 +379,6 @@ class _WaterNewEditScreenState extends State<WaterNewEditScreen> {
 
       Map<String, dynamic> params = {
         "water_id": water_id,
-        "uu_id" : uu_id,
         "measurement_date" : measurement_date,
         "amount": water_amount,
         "unit": water_unit,
@@ -388,8 +387,6 @@ class _WaterNewEditScreenState extends State<WaterNewEditScreen> {
       };
 
       dynamic responseJSON = await postData(params, url);
-
-      print(responseJSON);
 
       if(responseJSON['status'] == 'Success'){
         Navigator.pop(context);
@@ -426,7 +423,7 @@ class _WaterNewEditScreenState extends State<WaterNewEditScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              HomeScreenHeader(),
+              ObservationScreenHeader(),
               Expanded(
                 child: Container(
                   decoration: BoxDecoration(

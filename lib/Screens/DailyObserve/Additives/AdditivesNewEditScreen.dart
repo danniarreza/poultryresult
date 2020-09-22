@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:intl/intl.dart';
+import 'package:poultryresult/Services/database_helper.dart';
+import 'package:poultryresult/Services/globalidentifier_generator.dart';
+import 'package:poultryresult/Services/rest_api.dart';
 import 'package:poultryresult/Widgets/Sidebar_Main.dart';
 import 'package:poultryresult/Widgets/dialogs.dart';
 import 'package:poultryresult/Widgets/homescreenappbar.dart';
 import 'package:poultryresult/Widgets/homescreenheader.dart';
+import 'package:poultryresult/Widgets/observationscreenheader.dart';
 
 class AdditivesNewEditScreen extends StatefulWidget {
   @override
@@ -12,44 +17,98 @@ class AdditivesNewEditScreen extends StatefulWidget {
 
 class _AdditivesNewEditScreenState extends State<AdditivesNewEditScreen> {
 
-  DateTime _selectedDateTime = DateTime.now();
+  bool isNew;
+
+  String observedInputUsesId;
+  String observedInputTypesId;
+  int inspectionRound;
+  int additiveAmount;
+  
+  DateTime selectedDateTime;
   String additiveArticle;
 
-  int amountDayFlock;
+  Map<String, dynamic> routeData = {};
+  Map<String, dynamic> user;
+  Map<String, dynamic> farm_site;
+  Map<String, dynamic> management_location;
+  Map<String, dynamic> selectedInputType;
+  Map<String, dynamic> tempInputType;
 
-  List<String> amountDayFlockUnits = [
-    "g",
-    "kg",
-    "100kg",
-    "ton"
-  ];
-  String _currentSelectedamountDayFlockUnits;
+  bool farmSiteLoaded = false;
 
-  List<String> applicationMethods = [
-    "Drinking Water",
-    "Spraying",
-    "Atomist",
-  ];
+  List<Map<String, dynamic>> inputTypes = List<Map<String, dynamic>>();
 
-  String _currentSelectedApplicationMethod;
-
-  List<String> medicalConditions = [
-    "None",
-    "Breathing",
-    "Stomach Intestine",
-    "Movement",
-  ];
 
   Map<dynamic, bool> warningList = {
-    "additiveArticleWarning" : false,
-    "amountDayFlockWarning" : false,
-    "amountDayFlockUnitsWarning" : false,
-    "applicationMethodWarning" : false,
-    "medicalConditionsWarning" : false,
+    "selectedInputTypeWarning" : false,
+    "additiveAmountWarning" : false,
   };
 
-  String _currentSelectedMedicalConditions;
+//  String _currentSelectedMedicalConditions;
   final GlobalKey<FormState> formKey = GlobalKey<FormState>();
+
+  @override
+  void initState() {
+    // TODO: implement setState
+    super.initState();
+    _getFarmSiteInformation();
+
+  }
+
+  _getFarmSiteInformation() async {
+    List<Map<String, dynamic>> users = await DatabaseHelper.instance.get('user');
+    List<Map<String, dynamic>> farm_sites = await DatabaseHelper.instance.getWhere('farm_sites', ['_farm_sites_id'], [users[0]['_farm_sites_id']]);
+
+    List<Map<String, dynamic>> management_locations = await DatabaseHelper.instance.getWhere('management_location', ['_management_location_id'], [users[0]['_management_location_id']]);
+
+    List<Map<String, dynamic>> animal_locations = await DatabaseHelper.instance.getWhere('animal_location', ['_animal_location_id'], [management_locations[0]['management_location_animal_location_id']]);
+    List<Map<String, dynamic>> rounds = await DatabaseHelper.instance.getById('round', management_locations[0]['management_location_round_id']);
+
+    List<Map<String, dynamic>> observedanimalcounts = await DatabaseHelper.instance.getWhere(
+        'observed_animal_count', ['observed_animal_counts_mln_id'], [management_locations[0]['_management_location_id']]
+    );
+
+    int animal_count = 0;
+
+    observedanimalcounts.forEach((observedanimalcount) {
+      animal_count = animal_count + observedanimalcount['observed_animal_counts_animals_in'] - observedanimalcount['observed_animal_counts_animals_out'];
+    });
+
+    Map<String, dynamic> new_management_location = Map<String, dynamic>();
+
+    new_management_location = {
+      ...management_locations[0],
+      'animal_count' : animal_count,
+      'location' : animal_locations[0],
+      'round' : rounds[0],
+
+    };
+
+    List<Map<String, dynamic>> inputTypesFromDB = await DatabaseHelper.instance.getWhere('input_types', ['input_types_ite_type'], ['Additive']);
+
+    List<Map<String, dynamic>> newInputTypes = List<Map<String, dynamic>>();
+
+    Map<String, dynamic> initialInputType;
+
+    inputTypesFromDB.forEach((element) {
+      newInputTypes.add(element);
+
+      tempInputType != null && element['_input_types_id'] == tempInputType['_input_types_id'] ? initialInputType = element : null;
+    });
+
+//    Map<String, dynamic> initialInputType = newInputTypes.firstWhere((inputType) => inputType['_input_types_id'] == tempInputType['_input_types_id']);
+//    print(initialInputType);
+
+    setState(() {
+      user = users[0];
+      farm_site = farm_sites[0];
+      management_location = new_management_location;
+      inputTypes = newInputTypes;
+      selectedInputType = initialInputType;
+      farmSiteLoaded = true;
+    });
+  }
+
 
   _buildInspectionInformationCard(){
     return Padding(
@@ -66,92 +125,101 @@ class _AdditivesNewEditScreenState extends State<AdditivesNewEditScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Text(
-                  "Addition Round : 1",
-                  style: TextStyle(
-                      color: Colors.black,
-                      fontFamily: "Montserrat",
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600
-                  ),
-                ),
-                Container(
-                  height: 0.25,
-                  margin: EdgeInsets.symmetric(vertical: 10),
-                  color: Colors.grey,
-                ),
-                Container(
-                  margin: EdgeInsets.only(top: 5),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                farmSiteLoaded == true ? Container(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: <Widget>[
-                          Text(
-                              "House : 1",
-                              style: TextStyle(
-                                  color: Colors.black,
-                                  fontFamily: "Montserrat",
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w400
-                              )
-                          ),
-                          SizedBox(
-                            height: 5,
-                          ),
-                          Text(
-                              "Round Nr. : 3",
-                              style: TextStyle(
-                                  color: Colors.black,
-                                  fontFamily: "Montserrat",
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w400
-                              )
-                          )
-                        ],
+                      Text(
+                        "Addition Round : " + inspectionRound.toString(),
+                        style: TextStyle(
+                            color: Colors.black,
+                            fontFamily: "Montserrat",
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600
+                        ),
                       ),
-                      SizedBox(
-                        width: MediaQuery.of(context).size.width / 30,
+                      Container(
+                        height: 0.25,
+                        margin: EdgeInsets.symmetric(vertical: 10),
+                        color: Colors.grey,
                       ),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: <Widget>[
-                          Text(
-                              "Date :",
-                              style: TextStyle(
-                                  color: Colors.black,
-                                  fontFamily: "Montserrat",
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w400
-                              )
-                          ),
-                          SizedBox(
-                            height: 5,
-                          ),
-                          Text(
-                              DateFormat('dd MMMM yyyy').format(_selectedDateTime),
-                              style: TextStyle(
-                                  color: Colors.black,
-                                  fontFamily: "Montserrat",
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w400
-                              )
-                          )
-                        ],
+                      Container(
+                        margin: EdgeInsets.only(top: 5),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: <Widget>[
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: <Widget>[
+                                Text(
+                                    "House : " + user['_animal_location_id'].toString(),
+                                    style: TextStyle(
+                                        color: Colors.black,
+                                        fontFamily: "Montserrat",
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w400
+                                    )
+                                ),
+                                SizedBox(
+                                  height: 5,
+                                ),
+                                Text(
+                                    "Round Nr. : " + management_location['round']['round_nr'].toString(),
+                                    style: TextStyle(
+                                        color: Colors.black,
+                                        fontFamily: "Montserrat",
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w400
+                                    )
+                                )
+                              ],
+                            ),
+                            SizedBox(
+                              width: MediaQuery.of(context).size.width / 30,
+                            ),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: <Widget>[
+                                Text(
+                                    "Date :",
+                                    style: TextStyle(
+                                        color: Colors.black,
+                                        fontFamily: "Montserrat",
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w400
+                                    )
+                                ),
+                                SizedBox(
+                                  height: 5,
+                                ),
+                                Text(
+                                    DateFormat('dd MMMM yyyy').format(selectedDateTime),
+                                    style: TextStyle(
+                                        color: Colors.black,
+                                        fontFamily: "Montserrat",
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w400
+                                    )
+                                )
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
+                ) : SpinKitThreeBounce(
+                    color: Color.fromRGBO(253, 184, 19, 1),
+                    size: 30
                 ),
                 Container(
                   height: 0.25,
                   margin: EdgeInsets.symmetric(vertical: 20),
                   color: Colors.grey,
                 ),
-                _buildArticleForm(),
-                _buildAmountDayFlockForm(),
-                _buildApplicationMethodForm(),
-                _buildMedicalConditionForm(),
+                _buildAdditivesArticleSelectionForm(),
+                _buildAdditivesUnitOfMeasurementForm(),
+                _buildAdditivesAmountForm(),
                 SizedBox(height: 15,),
                 _buildSubmitButton(),
               ],
@@ -162,7 +230,7 @@ class _AdditivesNewEditScreenState extends State<AdditivesNewEditScreen> {
     );
   }
 
-  _buildArticleForm(){
+  _buildAdditivesArticleSelectionForm(){
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
@@ -175,179 +243,62 @@ class _AdditivesNewEditScreenState extends State<AdditivesNewEditScreen> {
             )
         ),
         SizedBox(height: 10,),
-        TextFormField(
-          decoration: InputDecoration(
-            filled: true,
-            fillColor: Colors.grey[100],
-            hintText: "Insert Article",
+        Container(
+          height: 45,
+          child: inputTypes.length > 0 ? DropdownButtonFormField<Map>(
+            decoration: InputDecoration(
+              isDense: true,
+              contentPadding: EdgeInsets.symmetric(vertical: 12.5, horizontal: 12.5),
+              filled: true,
+              fillColor: Colors.grey[100],
+              enabledBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.transparent),
+                borderRadius: BorderRadius.all(Radius.circular(15)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.transparent),
+                borderRadius: BorderRadius.all(Radius.circular(15)),
+              ),
+            ),
+            value: selectedInputType,
             isDense: true,
-            contentPadding: EdgeInsets.symmetric(vertical: 12.5, horizontal: 12.5),
-            enabledBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Colors.transparent),
-              borderRadius: BorderRadius.all(Radius.circular(15)),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Colors.transparent),
-              borderRadius: BorderRadius.all(Radius.circular(15)),
-            ),
-            suffixIcon: Icon(Icons.search),
-          ),
-          validator: (String value) {
-            if(value == null || value == ''){
+            onChanged: (Map newValue) {
               setState(() {
-                warningList["additiveArticleWarning"] = true;
+                selectedInputType = newValue;
+                warningList["selectedInputTypeWarning"] = false;
               });
-              return null;
-            } else {
-              setState(() {
-                warningList["additiveArticleWarning"] = false;
-              });
-              return null;
-            }
-          },
-          onSaved: (String value){
-            setState(() {
-              additiveArticle = value;
-            });
-          },
-        ),
-        warningList["additiveArticleWarning"] == true ? Container(
-          padding: EdgeInsets.only(left: 5, top: 10),
-          child: Text(
-            "Please fill in article",
-            style: TextStyle(
-                fontSize: 14,
-                color: Colors.red
-            ),
-          ),
-        ) : SizedBox(height: 0,),
-        SizedBox(height: 10,),
-      ]
-    );
-  }
-
-  _buildAmountDayFlockForm(){
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        Text(
-          "Amount/day/flock",
-          style: TextStyle(
-              fontFamily: "Montserrat",
-              fontSize: 14,
-              fontWeight: FontWeight.w600
-          )
-        ),
-        SizedBox(height: 10,),
-        Row(
-          children: <Widget>[
-            Flexible(
-              flex: 3,
-              child: TextFormField(
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  filled: true,
-                  fillColor: Colors.grey[100],
-                  hintText: "Insert Amount",
-                  isDense: true,
-                  contentPadding: EdgeInsets.symmetric(vertical: 12.5, horizontal: 12.5),
-                  enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Colors.transparent),
-                    borderRadius: BorderRadius.all(Radius.circular(15)),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Colors.transparent),
-                    borderRadius: BorderRadius.all(Radius.circular(15)),
-                  ),
+            },
+            validator: (Map newValue){
+              if(newValue == null){
+                setState(() {
+                  warningList["selectedInputTypeWarning"] = true;
+                });
+                return null;
+              } else {
+                setState(() {
+                  warningList["selectedInputTypeWarning"] = false;
+                });
+                return null;
+              }
+            },
+            items: inputTypes.map((Map valueMap) {
+              return DropdownMenuItem<Map>(
+                value: valueMap,
+                child: Text(
+                    valueMap['input_types_code']
+//                  valueMap['additive_batch'].toString() + ", " + valueMap['additive_kind'] + ", Storage " + valueMap['additive_storage'].toString(),
                 ),
-                validator: (String value) {
-                  if(value == null || value == ''){
-                    setState(() {
-                      warningList["amountDayFlockWarning"] = true;
-                    });
-                    return null;
-                  } else {
-                    setState(() {
-                      warningList["amountDayFlockWarning"] = false;
-                    });
-                    return null;
-                  }
-                },
-                onSaved: (String value){
-                  if(value != null && value != ''){
-                    setState(() {
-                      amountDayFlock = int.parse(value);
-                    });
-                  }
-                },
-              ),
-            ),
-            SizedBox(width: 10,),
-            Flexible(
-              flex: 2,
-              child: Container(
-                height: 45,
-                child: DropdownButtonFormField<String>(
-                  decoration: InputDecoration(
-                    isDense: true,
-                    contentPadding: EdgeInsets.symmetric(vertical: 12.5, horizontal: 12.5),
-                    filled: true,
-                    fillColor: Colors.grey[100],
-                    enabledBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: Colors.transparent),
-                      borderRadius: BorderRadius.all(Radius.circular(15)),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: Colors.transparent),
-                      borderRadius: BorderRadius.all(Radius.circular(15)),
-                    ),
-                  ),
-                  value: _currentSelectedamountDayFlockUnits,
-                  hint: Text("Units"),
-                  isDense: true,
-                  validator: (String value) {
-                    if(value == null){
-                      setState(() {
-                        warningList["amountDayFlockUnitsWarning"] = true;
-                      });
-                      return null;
-                    } else {
-                      setState(() {
-                        warningList["amountDayFlockUnitsWarning"] = false;
-                      });
-                      return null;
-                    }
-                  },
-                  onChanged: (String newValue) {
-                    setState(() {
-                      _currentSelectedamountDayFlockUnits = newValue;
-                    });
-                  },
-                  items: amountDayFlockUnits.map((String value) {
-                    return DropdownMenuItem<String>(
-                      value: value,
-                      child: Text(value),
-                    );
-                  }).toList(),
-                ),
-              ),
-            )
-          ],
-        ),
-        warningList["amountDayFlockWarning"] == true ? Container(
-          padding: EdgeInsets.only(left: 5, top: 10),
-          child: Text(
-            "Please fill in amount",
-            style: TextStyle(
-                fontSize: 14,
-                color: Colors.red
-            ),
+              );
+            }).toList(),
+          ) : SpinKitThreeBounce(
+              color: Color.fromRGBO(253, 184, 19, 1),
+              size: 30
           ),
-        ) : SizedBox(height: 0,),
-        warningList["amountDayFlockUnitsWarning"] == true ? Container(
+        ),
+        warningList["selectedInputTypeWarning"] == true ? Container(
           padding: EdgeInsets.only(left: 5, top: 10),
           child: Text(
-            "Please select units",
+            "Please select an article",
             style: TextStyle(
                 fontSize: 14,
                 color: Colors.red
@@ -359,27 +310,77 @@ class _AdditivesNewEditScreenState extends State<AdditivesNewEditScreen> {
     );
   }
 
-  _buildApplicationMethodForm(){
+  _buildAdditivesUnitOfMeasurementForm(){
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        Text(
-            "Application Method",
-            style: TextStyle(
-                fontFamily: "Montserrat",
-                fontSize: 14,
-                fontWeight: FontWeight.w600
-            )
-        ),
-        SizedBox(height: 10,),
-        Container(
-          height: 45,
-          child: DropdownButtonFormField<String>(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Container(
+            child: Row(
+              children: <Widget>[
+                Text(
+                    "Unit",
+                    style: TextStyle(
+                        fontFamily: "Montserrat",
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600
+                    )
+                ),
+              ],
+            ),
+          ),
+          SizedBox(height: 10,),
+          Container(
+            height: 45,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.all(Radius.circular(15)),
+              color: Colors.grey[100],
+            ),
+            child: Row(
+              children: <Widget>[
+                Container(
+                  padding: EdgeInsets.symmetric(vertical: 12.5, horizontal: 12.5),
+                  child: Text(selectedInputType != null ? selectedInputType['input_types_uom'] : ""),
+                )
+              ],
+            ),
+          ),
+          warningList["selectedInputTypeWarning"] == true ? Container(
+            padding: EdgeInsets.only(left: 5, top: 10),
+            child: Text(
+              "Please select an article",
+              style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.red
+              ),
+            ),
+          ) : SizedBox(height: 0,),
+          SizedBox(height: 10,),
+        ]
+    );
+  }
+
+  _buildAdditivesAmountForm(){
+    return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+              "Amount",
+              style: TextStyle(
+                  fontFamily: "Montserrat",
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600
+              )
+          ),
+          SizedBox(height: 10,),
+          TextFormField(
+            keyboardType: TextInputType.number,
+            initialValue: additiveAmount != null ? additiveAmount.toString() : null,
             decoration: InputDecoration(
-              isDense: true,
-              contentPadding: EdgeInsets.symmetric(vertical: 12.5, horizontal: 12.5),
               filled: true,
               fillColor: Colors.grey[100],
+              hintText: "Insert Amount",
+              isDense: true,
+              contentPadding: EdgeInsets.symmetric(vertical: 12.5, horizontal: 12.5),
               enabledBorder: OutlineInputBorder(
                 borderSide: BorderSide(color: Colors.transparent),
                 borderRadius: BorderRadius.all(Radius.circular(15)),
@@ -389,122 +390,47 @@ class _AdditivesNewEditScreenState extends State<AdditivesNewEditScreen> {
                 borderRadius: BorderRadius.all(Radius.circular(15)),
               ),
             ),
-            value: _currentSelectedApplicationMethod,
-            hint: Text("Select method"),
-            onChanged: (String newValue){
-              setState(() {
-                _currentSelectedApplicationMethod = newValue;
-              });
-            },
             validator: (String value) {
-              if(value == null){
+              if(value == null || value == ''){
                 setState(() {
-                  warningList["applicationMethodWarning"] = true;
+                  warningList["additiveAmountWarning"] = true;
                 });
                 return null;
               } else {
                 setState(() {
-                  warningList["applicationMethodWarning"] = false;
+                  warningList["additiveAmountWarning"] = false;
                 });
                 return null;
               }
             },
-            items: applicationMethods.map((String value) {
-              return DropdownMenuItem<String>(
-                value: value,
-                child: Text(value),
-              );
-            }).toList(),
+            onSaved: (String value){
+              setState(() {
+                additiveAmount = int.parse(value);
+                warningList["additiveAmountWarning"] = value == "" || value == null ? true : false;
+              });
+            },
+            onChanged: (String value){
+              setState(() {
+                additiveAmount = int.parse(value);
+                warningList["additiveAmountWarning"] = value == "" || value == null ? true : false;
+              });
+            },
           ),
-        ),
-        warningList["applicationMethodWarning"] == true ? Container(
-          padding: EdgeInsets.only(left: 5, top: 10),
-          child: Text(
-            "Please select application method",
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.red
+          warningList["additiveAmountWarning"] == true ? Container(
+            padding: EdgeInsets.only(left: 5, top: 10),
+            child: Text(
+              "Please fill in amount",
+              style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.red
+              ),
             ),
-          ),
-        ) : SizedBox(height: 0,),
-        SizedBox(height: 10,),
-      ],
+          ) : SizedBox(height: 0,),
+          SizedBox(height: 10,),
+        ]
     );
   }
 
-  _buildMedicalConditionForm(){
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        Text(
-            "Medical Condition",
-            style: TextStyle(
-                fontFamily: "Montserrat",
-                fontSize: 14,
-                fontWeight: FontWeight.w600
-            )
-        ),
-        SizedBox(height: 10,),
-        Container(
-          height: 45,
-          child: DropdownButtonFormField<String>(
-            decoration: InputDecoration(
-              isDense: true,
-              contentPadding: EdgeInsets.symmetric(vertical: 12.5, horizontal: 12.5),
-              filled: true,
-              fillColor: Colors.grey[100],
-              enabledBorder: OutlineInputBorder(
-                borderSide: BorderSide(color: Colors.transparent),
-                borderRadius: BorderRadius.all(Radius.circular(15)),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderSide: BorderSide(color: Colors.transparent),
-                borderRadius: BorderRadius.all(Radius.circular(15)),
-              ),
-            ),
-            value: _currentSelectedMedicalConditions,
-            hint: Text("Select condition"),
-            onChanged: (String newValue){
-              setState(() {
-                _currentSelectedMedicalConditions = newValue;
-//                state.didChange(newValue);
-              });
-            },
-            validator: (String value) {
-              if(value == null){
-                setState(() {
-                  warningList["medicalConditionsWarning"] = true;
-                });
-                return null;
-              } else {
-                setState(() {
-                  warningList["medicalConditionsWarning"] = false;
-                });
-                return null;
-              }
-            },
-            items: medicalConditions.map((String value) {
-              return DropdownMenuItem<String>(
-                value: value,
-                child: Text(value),
-              );
-            }).toList(),
-          ),
-        ),
-        warningList["medicalConditionsWarning"] == true ? Container(
-          padding: EdgeInsets.only(left: 5, top: 10),
-          child: Text(
-            "Please select medical conditions",
-            style: TextStyle(
-                fontSize: 14,
-                color: Colors.red
-            ),
-          ),
-        ) : SizedBox(height: 0,),
-        SizedBox(height: 10,),
-      ],
-    );
-  }
 
   _buildSubmitButton(){
     return GestureDetector(
@@ -560,13 +486,174 @@ class _AdditivesNewEditScreenState extends State<AdditivesNewEditScreen> {
   formSubmit() async{
     Dialogs.waitingDialog(context, "Submitting...", "Please Wait", false);
 
-    Future.delayed(Duration(seconds: 1), (){
-      Navigator.pop(context);
-    });
+    String management_location_id = management_location['_management_location_id'];
+    String measurement_date = DateFormat('yyyy-MM-dd').format(selectedDateTime);
+    String creation_date = DateFormat("yyyy-MM-dd HH:mm:ss").format(DateTime.now());
+    int treatment_nr = inspectionRound;
+    int additive_amount = additiveAmount;
+    String oue_type = "Additive";
+    String input_types_id = selectedInputType['_input_types_id'].toString();
+    String unit_of_measurement = selectedInputType['input_types_uom'];
+    String user_name =  user['user_name'];
+
+//    print(isNew);
+
+    if(isNew == true){
+//      List<Map<String, dynamic>> observed_input_uses = await DatabaseHelper.instance.get('observed_input_uses');
+//      int new_observed_input_uses_id = observed_input_uses[observed_input_uses.length - 1]['_observed_input_uses_id'] + 1;
+
+//      print(selectedInputType);
+//      print(additiveAmount);
+
+      String new_observed_input_uses_id = generate_GlobalIdentifier();
+
+      int inserted_observed_input_uses_id = await DatabaseHelper.instance.insert('observed_input_uses', {
+        DatabaseHelper.observed_input_uses_id: new_observed_input_uses_id,
+        DatabaseHelper.observed_input_uses_mln_id: management_location_id,
+        DatabaseHelper.observed_input_uses_oue_type : oue_type,
+        DatabaseHelper.observed_input_uses_measurement_date: measurement_date,
+        DatabaseHelper.observed_input_uses_treatment_nr : treatment_nr,
+        DatabaseHelper.observed_input_uses_total_amount : additive_amount,
+        DatabaseHelper.observed_input_uses_unit : unit_of_measurement,
+        DatabaseHelper.observed_input_uses_creation_date: creation_date,
+        DatabaseHelper.observed_input_uses_mutation_date : creation_date,
+        DatabaseHelper.observed_input_uses_observed_by : user_name,
+      });
+
+//      List<Map<String, dynamic>> observed_input_types = await DatabaseHelper.instance.get('observed_input_types');
+//      int new_observed_input_types_id = observed_input_types[observed_input_types.length - 1]['_observed_input_types_id'] + 1;
+      String new_observed_input_types_id = generate_GlobalIdentifier();
+
+      await DatabaseHelper.instance.insert('observed_input_types', {
+        DatabaseHelper.observed_input_types_id: new_observed_input_types_id,
+        DatabaseHelper.observed_input_types_ite_id: input_types_id,
+        DatabaseHelper.observed_input_types_oue_id : new_observed_input_uses_id,
+        DatabaseHelper.observed_input_types_amount: additive_amount,
+        DatabaseHelper.observed_input_types_creation_date : creation_date,
+        DatabaseHelper.observed_input_types_mutation_date : creation_date
+      });
+
+      String url = "observedinputuses/insert";
+
+      Map<String, dynamic> params = {
+        "observed_input_use_id": new_observed_input_uses_id,
+        "management_location_id": management_location_id,
+        "oue_type" : oue_type,
+        "measurement_date" : measurement_date,
+        "total_amount": additive_amount,
+        "unit": unit_of_measurement,
+        "user_name": user_name
+      };
+
+      dynamic responseJSON = await postData(params, url);
+
+      if(responseJSON['status'] == 'Success') {
+        String url = "observedinputtypes/insert";
+
+        Map<String, dynamic> params = {
+          "observed_input_type_id": new_observed_input_types_id,
+          "amount": additive_amount,
+          "observed_input_uses_id": new_observed_input_uses_id,
+          "input_type_id": input_types_id,
+        };
+
+        dynamic responseJSON = await postData(params, url);
+
+        if (responseJSON['status'] == 'Success') {
+          Navigator.pop(context);
+          Navigator.pop(context);
+        }
+      }
+
+    } else if(isNew == false){
+      String new_observed_input_uses_id = observedInputUsesId;
+      String new_observed_input_types_id = observedInputTypesId;
+
+//      print(new_observed_input_uses_id);
+//      print(new_observed_input_types_id);
+//      print(additiveAmount);
+//      print(input_types_id);
+
+      await DatabaseHelper.instance.update('observed_input_uses', {
+        DatabaseHelper.observed_input_uses_id: new_observed_input_uses_id,
+        DatabaseHelper.observed_input_uses_mln_id: management_location_id,
+        DatabaseHelper.observed_input_uses_oue_type : oue_type,
+        DatabaseHelper.observed_input_uses_measurement_date: measurement_date,
+        DatabaseHelper.observed_input_uses_treatment_nr : treatment_nr,
+        DatabaseHelper.observed_input_uses_total_amount : additive_amount,
+        DatabaseHelper.observed_input_uses_unit : unit_of_measurement,
+        DatabaseHelper.observed_input_uses_mutation_date : creation_date,
+        DatabaseHelper.observed_input_uses_observed_by : user_name,
+      });
+
+      await DatabaseHelper.instance.update('observed_input_types', {
+        DatabaseHelper.observed_input_types_id: new_observed_input_types_id,
+        DatabaseHelper.observed_input_types_ite_id: input_types_id,
+        DatabaseHelper.observed_input_types_oue_id : new_observed_input_uses_id,
+        DatabaseHelper.observed_input_types_amount: additive_amount,
+        DatabaseHelper.observed_input_types_mutation_date : creation_date
+      });
+
+      String url = "observedinputuses/update";
+
+      Map<String, dynamic> params = {
+        "observed_input_use_id": new_observed_input_uses_id,
+        "management_location_id" : management_location_id,
+        "oue_type" : oue_type,
+        "measurement_date" : measurement_date,
+        "total_amount": additive_amount,
+        "unit": unit_of_measurement,
+        "user_name": user_name
+      };
+
+      dynamic responseJSON = await postData(params, url);
+
+      if(responseJSON['status'] == 'Success'){
+
+        String url = "observedinputtypes/update";
+
+        Map<String, dynamic> params = {
+          "observed_input_type_id": new_observed_input_types_id,
+          "amount": additive_amount,
+          "observed_input_uses_id" : new_observed_input_uses_id,
+          "input_type_id" : input_types_id,
+        };
+
+        dynamic responseJSON = await postData(params, url);
+
+        if(responseJSON['status'] == 'Success'){
+          Navigator.pop(context);
+          Navigator.pop(context);
+        }
+
+      }
+
+//        Future.delayed(Duration(seconds: 1), (){
+//          Navigator.pop(context);
+//          Navigator.pop(context);
+//        });
+    }
+
+
   }
+
 
   @override
   Widget build(BuildContext context) {
+
+    routeData = ModalRoute.of(context).settings.arguments;
+
+    setState(() {
+      routeData['observedInputUsesId'] != null ? isNew = false : isNew = true;
+      routeData['observedInputUsesId'] != null ? observedInputUsesId = routeData['observedInputUsesId'] : null;
+      routeData['observedInputTypesId'] != null ? observedInputTypesId = routeData['observedInputTypesId'] : null;
+      routeData['additiveAmount'] != null ? additiveAmount = routeData['additiveAmount'] : null;
+      routeData['selectedInputType'] != null ? tempInputType = routeData['selectedInputType'] : null;
+      selectedDateTime = routeData['selectedDateTime'];
+      inspectionRound = routeData['inspectionRound'];
+    });
+
+
     return Scaffold(
       backgroundColor: Theme.of(context).primaryColor,
       appBar: HomeScreenAppBar(),
@@ -581,7 +668,7 @@ class _AdditivesNewEditScreenState extends State<AdditivesNewEditScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              HomeScreenHeader(),
+              ObservationScreenHeader(),
               Expanded(
                 child: Container(
 //                padding: EdgeInsets.symmetric(horizontal: 20),

@@ -50,28 +50,28 @@ class _DailyObserveHomeScreenState extends State<DailyObserveHomeScreen> {
   _getFarmSiteLocations() async {
     List<Map<String, dynamic>> users = await DatabaseHelper.instance.get('user');
 
-    List<Map<String, dynamic>> farm_sites = await DatabaseHelper.instance.getById('farm_sites', users[0]['_farm_sites_id']);
+    List<Map<String, dynamic>> farm_sites = await DatabaseHelper.instance.getWhere('farm_sites', ['_farm_sites_id'], [users[0]['_farm_sites_id']]);
 
-//    String url = "managementlocation/get_by_farmsite";
-//    Map<String, dynamic> params = {
-//      "farm_sites_id": users[0]['_farm_sites_id'],
-//    };
-//
-//    List<dynamic> responseJSON = await postData(params, url);
-
-    List<Map<String, dynamic>> rounds_from_db = await DatabaseHelper.instance.getByReference('round', 'farm_sites', 'round_fst_id', users[0]['_farm_sites_id']);
+    List<Map<String, dynamic>> rounds_from_db = await DatabaseHelper.instance.getWhere(
+        'round', ['round_fst_id'], [users[0]['_farm_sites_id']]
+    );
 
     List<Map<String, dynamic>> new_management_locations = List<Map<String, dynamic>>();
 
     rounds_from_db.forEach((round) async {
-      List<Map<String, dynamic>> management_locations_from_db = await DatabaseHelper.instance.getByReference('management_location', 'round', 'management_location_round_id', round['_round_id']);
+      List<Map<String, dynamic>> management_locations_from_db = await DatabaseHelper.instance.getWhere(
+          'management_location', ['management_location_round_id'], [round['_round_id']]
+      );
 
       management_locations_from_db.forEach((management_location_from_db) async {
-        List<Map<String, dynamic>> locations = await DatabaseHelper.instance.getById('location', management_location_from_db['management_location_location_id']);
+        List<Map<String, dynamic>> animal_locations = await DatabaseHelper.instance.getWhere('animal_location', ['_animal_location_id'], [management_location_from_db['management_location_animal_location_id']]);
 
-        List<Map<String, dynamic>> rounds = await DatabaseHelper.instance.getById('round', management_location_from_db['management_location_round_id']);
+        List<Map<String, dynamic>> rounds = await DatabaseHelper.instance.getWhere('round', ['_round_id'], [management_location_from_db['management_location_round_id']]);
 
-        List<Map<String, dynamic>> observedanimalcounts = await DatabaseHelper.instance.getByReference('observed_animal_count', 'management_location', 'observed_animal_counts_aln_id', management_location_from_db['_management_location_id']);
+        List<Map<String, dynamic>> observedanimalcounts = await DatabaseHelper.instance.getWhere(
+            'observed_animal_count', ['observed_animal_counts_mln_id'], [management_location_from_db['_management_location_id']]
+        );
+
 
         int animal_count = 0;
 
@@ -82,7 +82,7 @@ class _DailyObserveHomeScreenState extends State<DailyObserveHomeScreen> {
         Map<String, dynamic> new_management_location = {
           ...management_location_from_db,
           'animal_count' : animal_count,
-          'location' : locations[0],
+          'animal_location' : animal_locations[0],
           'round' : rounds[0],
 
         };
@@ -138,11 +138,11 @@ class _DailyObserveHomeScreenState extends State<DailyObserveHomeScreen> {
 
                     DatabaseHelper.instance.update('user', {
                       DatabaseHelper.user_id : 1,
-                      DatabaseHelper.user_location_id: management_location['location']['_location_id'],
+                      DatabaseHelper.user_location_id: management_location['animal_location']['_animal_location_id'],
                       DatabaseHelper.user_management_location_id: management_location['_management_location_id']
                     });
 
-                    print("Daily Observation Card from House ${management_location['location']['_location_id']} tapped!");
+//                    print("Daily Observation Card from House ${management_location['animal_location']['_animal_location_id']} tapped!");
                     Navigator.pushNamed(context, "/dailyobservehousedetailscreen");
                   },
                   title: GestureDetector(
@@ -150,18 +150,18 @@ class _DailyObserveHomeScreenState extends State<DailyObserveHomeScreen> {
 
                       DatabaseHelper.instance.update('user', {
                         DatabaseHelper.user_id : 1,
-                        DatabaseHelper.user_location_id: management_location['location']['_location_id'],
+                        DatabaseHelper.user_location_id: management_location['animal_location']['_animal_location_id'],
                         DatabaseHelper.user_management_location_id: management_location['_management_location_id']
                       });
 
-                      print("Daily Observation Card from House ${management_location['location']['_location_id']} tapped!");
+//                      print("Daily Observation Card from House ${management_location['animal_location']['_animal_location_id']} tapped!");
                       Navigator.pushNamed(context, "/dailyobservehousedetailscreen");
                     },
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
                         Text(
-                          "House : ${management_location['location']['location_code']}",
+                          "House : ${management_location['animal_location']['animal_location_code']}",
                           style: TextStyle(
                               color: Colors.black,
                               fontFamily: "Montserrat",

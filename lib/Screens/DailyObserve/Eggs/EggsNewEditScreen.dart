@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:intl/intl.dart';
+import 'package:poultryresult/Services/database_helper.dart';
+import 'package:poultryresult/Services/globalidentifier_generator.dart';
+import 'package:poultryresult/Services/rest_api.dart';
 import 'package:poultryresult/Widgets/Sidebar_Main.dart';
 import 'package:poultryresult/Widgets/dialogs.dart';
 import 'package:poultryresult/Widgets/homescreenappbar.dart';
 import 'package:poultryresult/Widgets/homescreenheader.dart';
+import 'package:poultryresult/Widgets/observationscreenheader.dart';
 
 class EggsNewEditScreen extends StatefulWidget {
   @override
@@ -11,25 +16,81 @@ class EggsNewEditScreen extends StatefulWidget {
 }
 
 class _EggsNewEditScreenState extends State<EggsNewEditScreen> {
-  DateTime _selectedDateTime = DateTime.now();
 
-  List<String> eggQualities = [
-    "1st Quality",
-    "2nd Quality",
-    "Ground Eggs",
-  ];
+  bool isNew;
 
-  String _currentSelectedEggsQualities;
-  int eggAmount;
-  int eggWeight;
+  DateTime selectedDateTime;
+
+  String observationId;
+  int amountFirstQuality;
+  int amountSecondQuality;
+  int amountGroundEggs;
+  double eggWeight;
+  String weightUnit;
+
+  Map<String, dynamic> routeData = {};
+  Map<String, dynamic> user;
+  Map<String, dynamic> farm_site;
+  Map<String, dynamic> management_location;
+
+  bool farmSiteLoaded = false;
 
   Map<dynamic, bool> warningList = {
-    "eggQualitiesWarning" : false,
-    "eggAmountWarning": false,
+    "amountFirstQualityWarning" : false,
+    "amountSecondQualityWarning": false,
+    "amountGroundEggsWarning": false,
     "eggWeightWarning": false,
   };
 
   final GlobalKey<FormState> formKey = GlobalKey<FormState>();
+
+  @override
+  void initState() {
+    // TODO: implement setState
+    super.initState();
+    _getFarmSiteInformation();
+
+  }
+
+  _getFarmSiteInformation() async {
+    List<Map<String, dynamic>> users = await DatabaseHelper.instance.get('user');
+    List<Map<String, dynamic>> farm_sites = await DatabaseHelper.instance.getWhere('farm_sites', ['_farm_sites_id'], [users[0]['_farm_sites_id']]);
+
+    List<Map<String, dynamic>> management_locations = await DatabaseHelper.instance.getWhere('management_location', ['_management_location_id'], [users[0]['_management_location_id']]);
+
+    List<Map<String, dynamic>> animal_locations = await DatabaseHelper.instance.getWhere('animal_location', ['_animal_location_id'], [management_locations[0]['management_location_animal_location_id']]);
+    List<Map<String, dynamic>> rounds = await DatabaseHelper.instance.getById('round', management_locations[0]['management_location_round_id']);
+
+    List<Map<String, dynamic>> observedanimalcounts = await DatabaseHelper.instance.getWhere(
+        'observed_animal_count', ['observed_animal_counts_mln_id'], [management_locations[0]['_management_location_id']]
+    );
+
+    int animal_count = 0;
+
+    observedanimalcounts.forEach((observedanimalcount) {
+      animal_count = animal_count + observedanimalcount['observed_animal_counts_animals_in'] - observedanimalcount['observed_animal_counts_animals_out'];
+    });
+
+    Map<String, dynamic> new_management_location = Map<String, dynamic>();
+
+    new_management_location = {
+      ...management_locations[0],
+      'animal_count' : animal_count,
+      'location' : animal_locations[0],
+      'round' : rounds[0],
+
+    };
+
+    setState(() {
+      user = users[0];
+      farm_site = farm_sites[0];
+      management_location = new_management_location;
+      farmSiteLoaded = true;
+    });
+
+  }
+
+
 
   _buildInspectionInformationCard(){
     return Padding(
@@ -46,92 +107,101 @@ class _EggsNewEditScreenState extends State<EggsNewEditScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Text(
-                  "Eggs Round : 1",
-                  style: TextStyle(
-                      color: Colors.black,
-                      fontFamily: "Montserrat",
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600
-                  ),
-                ),
-                Container(
-                  height: 0.25,
-                  margin: EdgeInsets.symmetric(vertical: 10),
-                  color: Colors.grey,
-                ),
-                Container(
-                  margin: EdgeInsets.only(top: 5),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                farmSiteLoaded == true ? Container(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: <Widget>[
-                          Text(
-                              "House : 1",
-                              style: TextStyle(
-                                  color: Colors.black,
-                                  fontFamily: "Montserrat",
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w400
-                              )
-                          ),
-                          SizedBox(
-                            height: 5,
-                          ),
-                          Text(
-                              "Round Nr. : 3",
-                              style: TextStyle(
-                                  color: Colors.black,
-                                  fontFamily: "Montserrat",
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w400
-                              )
-                          )
-                        ],
+                      Text(
+                        "Egg Inspection : ",
+                        style: TextStyle(
+                            color: Colors.black,
+                            fontFamily: "Montserrat",
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600
+                        ),
                       ),
-                      SizedBox(
-                        width: MediaQuery.of(context).size.width / 30,
+                      Container(
+                        height: 0.25,
+                        margin: EdgeInsets.symmetric(vertical: 10),
+                        color: Colors.grey,
                       ),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: <Widget>[
-                          Text(
-                              "Date :",
-                              style: TextStyle(
-                                  color: Colors.black,
-                                  fontFamily: "Montserrat",
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w400
-                              )
-                          ),
-                          SizedBox(
-                            height: 5,
-                          ),
-                          Text(
-                              DateFormat('dd MMMM yyyy').format(_selectedDateTime),
-                              style: TextStyle(
-                                  color: Colors.black,
-                                  fontFamily: "Montserrat",
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w400
-                              )
-                          )
-                        ],
+                      Container(
+                        margin: EdgeInsets.only(top: 5),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: <Widget>[
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: <Widget>[
+                                Text(
+                                    "House : " + user['_animal_location_id'].toString(),
+                                    style: TextStyle(
+                                        color: Colors.black,
+                                        fontFamily: "Montserrat",
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w400
+                                    )
+                                ),
+                                SizedBox(
+                                  height: 5,
+                                ),
+                                Text(
+                                    "Round Nr. : " + management_location['round']['round_nr'].toString(),
+                                    style: TextStyle(
+                                        color: Colors.black,
+                                        fontFamily: "Montserrat",
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w400
+                                    )
+                                )
+                              ],
+                            ),
+                            SizedBox(
+                              width: MediaQuery.of(context).size.width / 30,
+                            ),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: <Widget>[
+                                Text(
+                                    "Date :",
+                                    style: TextStyle(
+                                        color: Colors.black,
+                                        fontFamily: "Montserrat",
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w400
+                                    )
+                                ),
+                                SizedBox(
+                                  height: 5,
+                                ),
+                                Text(
+                                    DateFormat('dd MMMM yyyy').format(selectedDateTime),
+                                    style: TextStyle(
+                                        color: Colors.black,
+                                        fontFamily: "Montserrat",
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w400
+                                    )
+                                )
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
+                ) : SpinKitThreeBounce(
+                    color: Color.fromRGBO(253, 184, 19, 1),
+                    size: 30
                 ),
                 Container(
                   height: 0.25,
                   margin: EdgeInsets.symmetric(vertical: 20),
                   color: Colors.grey,
                 ),
-                _buildEggsQualitiesForm(),
-                SizedBox(height: 15,),
-                _buildEggsAmountForm(),
-                SizedBox(height: 15,),
+                _buildEggsFirstQualityForm(),
+                _buildEggsSecondQualityForm(),
+                _buildEggsGroundEggsForm(),
                 _buildEggsWeightForm(),
                 SizedBox(height: 15,),
                 _buildSubmitButton(),
@@ -142,86 +212,13 @@ class _EggsNewEditScreenState extends State<EggsNewEditScreen> {
       ),
     );
   }
-
-  _buildEggsQualitiesForm(){
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        Text(
-            "Egg Quality",
-            style: TextStyle(
-                fontFamily: "Montserrat",
-                fontSize: 14,
-                fontWeight: FontWeight.w600
-            )
-        ),
-        SizedBox(height: 10,),
-        Container(
-          height: 45,
-          child: DropdownButtonFormField<String>(
-            decoration: InputDecoration(
-              isDense: true,
-              contentPadding: EdgeInsets.symmetric(vertical: 12.5, horizontal: 12.5),
-              filled: true,
-              fillColor: Colors.grey[100],
-              enabledBorder: OutlineInputBorder(
-                borderSide: BorderSide(color: Colors.transparent),
-                borderRadius: BorderRadius.all(Radius.circular(15)),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderSide: BorderSide(color: Colors.transparent),
-                borderRadius: BorderRadius.all(Radius.circular(15)),
-              ),
-            ),
-            value: _currentSelectedEggsQualities,
-            hint: Text("Select method"),
-            onChanged: (String newValue){
-              setState(() {
-                _currentSelectedEggsQualities = newValue;
-              });
-            },
-            validator: (String value) {
-              if(value == null){
-                setState(() {
-                  warningList["eggQualitiesWarning"] = true;
-                });
-                return null;
-              } else {
-                setState(() {
-                  warningList["eggQualitiesWarning"] = false;
-                });
-                return null;
-              }
-            },
-            items: eggQualities.map((String value) {
-              return DropdownMenuItem<String>(
-                value: value,
-                child: Text(value),
-              );
-            }).toList(),
-          ),
-        ),
-        warningList["eggQualitiesWarning"] == true ? Container(
-          padding: EdgeInsets.only(left: 5, top: 10),
-          child: Text(
-            "Please select egg quality",
-            style: TextStyle(
-                fontSize: 14,
-                color: Colors.red
-            ),
-          ),
-        ) : SizedBox(height: 0,),
-        SizedBox(height: 10,),
-      ],
-    );
-  }
-
-  _buildEggsAmountForm(){
+  
+  _buildEggsFirstQualityForm(){
     return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Text(
-              "Amount",
+              "First Quality",
               style: TextStyle(
                   fontFamily: "Montserrat",
                   fontSize: 14,
@@ -231,6 +228,7 @@ class _EggsNewEditScreenState extends State<EggsNewEditScreen> {
           SizedBox(height: 10,),
           TextFormField(
             keyboardType: TextInputType.number,
+            initialValue: amountFirstQuality != null ? amountFirstQuality.toString() : null,
             decoration: InputDecoration(
               filled: true,
               fillColor: Colors.grey[100],
@@ -249,23 +247,153 @@ class _EggsNewEditScreenState extends State<EggsNewEditScreen> {
             validator: (String value) {
               if(value == null || value == ''){
                 setState(() {
-                  warningList["eggAmountWarning"] = true;
+                  warningList["amountFirstQualityWarning"] = true;
                 });
                 return null;
               } else {
                 setState(() {
-                  warningList["eggAmountWarning"] = false;
+                  warningList["amountFirstQualityWarning"] = false;
                 });
                 return null;
               }
             },
             onSaved: (String value){
               setState(() {
-                eggAmount = int.parse(value);
+                amountFirstQuality = int.parse(value);
               });
             },
           ),
-          warningList["eggAmountWarning"] == true ? Container(
+          warningList["amountFirstQualityWarning"] == true ? Container(
+            padding: EdgeInsets.only(left: 5, top: 10),
+            child: Text(
+              "Please fill in amount",
+              style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.red
+              ),
+            ),
+          ) : SizedBox(height: 0,),
+          SizedBox(height: 10,),
+        ]
+    );
+  }
+
+  _buildEggsSecondQualityForm(){
+    return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+              "Second Quality",
+              style: TextStyle(
+                  fontFamily: "Montserrat",
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600
+              )
+          ),
+          SizedBox(height: 10,),
+          TextFormField(
+            keyboardType: TextInputType.number,
+            initialValue: amountSecondQuality != null ? amountSecondQuality.toString() : null,
+            decoration: InputDecoration(
+              filled: true,
+              fillColor: Colors.grey[100],
+              hintText: "Insert Amount",
+              isDense: true,
+              contentPadding: EdgeInsets.symmetric(vertical: 12.5, horizontal: 12.5),
+              enabledBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.transparent),
+                borderRadius: BorderRadius.all(Radius.circular(15)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.transparent),
+                borderRadius: BorderRadius.all(Radius.circular(15)),
+              ),
+            ),
+            validator: (String value) {
+              if(value == null || value == ''){
+                setState(() {
+                  warningList["amountSecondQualityWarning"] = true;
+                });
+                return null;
+              } else {
+                setState(() {
+                  warningList["amountSecondQualityWarning"] = false;
+                });
+                return null;
+              }
+            },
+            onSaved: (String value){
+              setState(() {
+                amountSecondQuality = int.parse(value);
+              });
+            },
+          ),
+          warningList["amountSecondQualityWarning"] == true ? Container(
+            padding: EdgeInsets.only(left: 5, top: 10),
+            child: Text(
+              "Please fill in amount",
+              style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.red
+              ),
+            ),
+          ) : SizedBox(height: 0,),
+          SizedBox(height: 10,),
+        ]
+    );
+  }
+
+  _buildEggsGroundEggsForm(){
+    return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+              "Ground Eggs",
+              style: TextStyle(
+                  fontFamily: "Montserrat",
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600
+              )
+          ),
+          SizedBox(height: 10,),
+          TextFormField(
+            keyboardType: TextInputType.number,
+            initialValue: amountGroundEggs != null ? amountGroundEggs.toString() : null,
+            decoration: InputDecoration(
+              filled: true,
+              fillColor: Colors.grey[100],
+              hintText: "Insert Amount",
+              isDense: true,
+              contentPadding: EdgeInsets.symmetric(vertical: 12.5, horizontal: 12.5),
+              enabledBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.transparent),
+                borderRadius: BorderRadius.all(Radius.circular(15)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.transparent),
+                borderRadius: BorderRadius.all(Radius.circular(15)),
+              ),
+            ),
+            validator: (String value) {
+              if(value == null || value == ''){
+                setState(() {
+                  warningList["amountGroundEggsWarning"] = true;
+                });
+                return null;
+              } else {
+                setState(() {
+                  warningList["amountGroundEggsWarning"] = false;
+                });
+                return null;
+              }
+            },
+            onSaved: (String value){
+              setState(() {
+                amountGroundEggs = int.parse(value);
+              });
+            },
+          ),
+          warningList["amountGroundEggsWarning"] == true ? Container(
             padding: EdgeInsets.only(left: 5, top: 10),
             child: Text(
               "Please fill in amount",
@@ -285,7 +413,7 @@ class _EggsNewEditScreenState extends State<EggsNewEditScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Text(
-              "Weight [grams/egg]",
+              "Egg Weight [" + weightUnit + "]",
               style: TextStyle(
                   fontFamily: "Montserrat",
                   fontSize: 14,
@@ -295,6 +423,7 @@ class _EggsNewEditScreenState extends State<EggsNewEditScreen> {
           SizedBox(height: 10,),
           TextFormField(
             keyboardType: TextInputType.number,
+            initialValue: eggWeight != null ? eggWeight.toString() : null,
             decoration: InputDecoration(
               filled: true,
               fillColor: Colors.grey[100],
@@ -325,7 +454,7 @@ class _EggsNewEditScreenState extends State<EggsNewEditScreen> {
             },
             onSaved: (String value){
               setState(() {
-                eggWeight = int.parse(value);
+                eggWeight = double.parse(value);
               });
             },
           ),
@@ -398,13 +527,114 @@ class _EggsNewEditScreenState extends State<EggsNewEditScreen> {
   formSubmit() async{
     Dialogs.waitingDialog(context, "Submitting...", "Please Wait", false);
 
-    Future.delayed(Duration(seconds: 1), (){
-      Navigator.pop(context);
-    });
+    String management_location_id = management_location['_management_location_id'];
+    String measurement_date = DateFormat('yyyy-MM-dd').format(selectedDateTime);
+    String creation_date = DateFormat("yyyy-MM-dd HH:mm:ss").format(DateTime.now());
+    int first_quality = amountFirstQuality;
+    int second_quality = amountSecondQuality;
+    int ground_eggs = amountGroundEggs;
+    double egg_weight = eggWeight;
+    String user_name =  user['user_name'];
+
+    if(isNew == true){
+      String new_observed_egg_production_id = generate_GlobalIdentifier();
+
+
+      int id = await DatabaseHelper.instance.insert('observed_egg_production', {
+        DatabaseHelper.observed_egg_production_id: new_observed_egg_production_id,
+        DatabaseHelper.observed_egg_production_mln_id: management_location_id,
+        DatabaseHelper.observed_egg_production_measurement_date : measurement_date,
+        DatabaseHelper.observed_egg_production_first_quality: first_quality,
+        DatabaseHelper.observed_egg_production_second_quality : second_quality,
+        DatabaseHelper.observed_egg_production_ground_eggs : ground_eggs,
+        DatabaseHelper.observed_egg_production_egg_weight : egg_weight,
+        DatabaseHelper.observed_egg_production_weight_unit : weightUnit,
+        DatabaseHelper.observed_egg_production_creation_date: creation_date,
+        DatabaseHelper.observed_egg_production_mutation_date : creation_date,
+        DatabaseHelper.observed_egg_production_observed_by : user_name,
+      });
+
+//      print(id);
+
+      String url = "eggproduction/insert";
+
+      Map<String, dynamic> params = {
+        "observed_egg_production_id": new_observed_egg_production_id,
+        "management_location_id" : management_location_id,
+        "measurement_date" : measurement_date,
+        "first_quality": first_quality,
+        "second_quality": second_quality,
+        "ground_quality": ground_eggs,
+        "egg_weight": egg_weight,
+        "user_name": user_name
+      };
+
+      dynamic responseJSON = await postData(params, url);
+
+      if(responseJSON['status'] == 'Success'){
+        Navigator.pop(context);
+        Navigator.pop(context);
+      }
+
+
+    } else if(isNew == false){
+      String new_observed_egg_production_id = observationId;
+      await DatabaseHelper.instance.update('observed_egg_production', {
+        DatabaseHelper.observed_egg_production_id: new_observed_egg_production_id,
+        DatabaseHelper.observed_egg_production_mln_id: management_location_id,
+        DatabaseHelper.observed_egg_production_measurement_date : measurement_date,
+        DatabaseHelper.observed_egg_production_first_quality: first_quality,
+        DatabaseHelper.observed_egg_production_second_quality : second_quality,
+        DatabaseHelper.observed_egg_production_ground_eggs : ground_eggs,
+        DatabaseHelper.observed_egg_production_egg_weight : egg_weight,
+        DatabaseHelper.observed_egg_production_weight_unit : weightUnit,
+        DatabaseHelper.observed_egg_production_creation_date: creation_date,
+        DatabaseHelper.observed_egg_production_mutation_date : creation_date,
+        DatabaseHelper.observed_egg_production_observed_by : user_name,
+      });
+
+      String url = "eggproduction/update";
+
+      Map<String, dynamic> params = {
+        "observed_egg_production_id": new_observed_egg_production_id,
+        "management_location_id" : management_location_id,
+        "measurement_date" : measurement_date,
+        "first_quality": first_quality,
+        "second_quality": second_quality,
+        "ground_quality": ground_eggs,
+        "egg_weight": egg_weight,
+        "user_name": user_name
+      };
+
+      dynamic responseJSON = await postData(params, url);
+
+      if(responseJSON['status'] == 'Success'){
+        Navigator.pop(context);
+        Navigator.pop(context);
+      }
+
+    }
+
+
+
   }
 
   @override
   Widget build(BuildContext context) {
+
+    routeData = ModalRoute.of(context).settings.arguments;
+
+    setState(() {
+      routeData['observationId'] != null ? isNew = false : isNew = true;
+      routeData['observationId'] != null ? observationId = routeData['observationId'] : null;
+      routeData['amountFirstQuality'] != null ? amountFirstQuality = routeData['amountFirstQuality'] : null;
+      routeData['amountSecondQuality'] != null ? amountSecondQuality = routeData['amountSecondQuality'] : null;
+      routeData['amountGroundEggs'] != null ? amountGroundEggs = routeData['amountGroundEggs'] : null;
+      routeData['eggWeight'] != null ? eggWeight = routeData['eggWeight'] : null;
+      routeData['weightUnit'] != null ? weightUnit = routeData['weightUnit'] : weightUnit = 'kg';
+      selectedDateTime = routeData['selectedDateTime'];
+    });
+
     return Scaffold(
       backgroundColor: Theme.of(context).primaryColor,
       appBar: HomeScreenAppBar(),
@@ -419,7 +649,7 @@ class _EggsNewEditScreenState extends State<EggsNewEditScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              HomeScreenHeader(),
+              ObservationScreenHeader(),
               Expanded(
                 child: Container(
 //                padding: EdgeInsets.symmetric(horizontal: 20),

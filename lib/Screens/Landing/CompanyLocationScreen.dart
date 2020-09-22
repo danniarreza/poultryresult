@@ -47,6 +47,9 @@ class _CompanyLocationScreenState extends State<CompanyLocationScreen> {
     _getMortalities();
     _getWaterUses();
     _getWeights();
+    _getInputTypes();
+    _getInputUses();
+    _getEggProduction();
 
     List<Map<String, dynamic>> rows = await DatabaseHelper.instance.get('farm_sites');
 
@@ -80,13 +83,13 @@ class _CompanyLocationScreenState extends State<CompanyLocationScreen> {
   }
 
   _getLocations() async {
-    List<Map<String, dynamic>> locations = await DatabaseHelper.instance.get('location');
+    List<Map<String, dynamic>> locations = await DatabaseHelper.instance.get('animal_location');
 
     if(locations.length > 0){
-      await DatabaseHelper.instance.delete('location');
+      await DatabaseHelper.instance.delete('animal_location');
     }
 
-    String url = "location/get_all";
+    String url = "animallocation/get_all";
     Map<String, dynamic> params = {
 
     };
@@ -94,17 +97,17 @@ class _CompanyLocationScreenState extends State<CompanyLocationScreen> {
     List<dynamic> responseJSON = await postData(params, url);
 
     responseJSON.forEach((row) async {
-      await DatabaseHelper.instance.insert('location', {
-        DatabaseHelper.location_id: row['location_id'],
-        DatabaseHelper.location_code: row['code'],
-        DatabaseHelper.location_fst_id: row['farm_site']['farm_sites_id'],
-        DatabaseHelper.location_lcn_type: row['farm_site']['fst_type'],
-        DatabaseHelper.location_date_start : row['date_start'],
-        DatabaseHelper.location_date_end : row['date_end']
+      await DatabaseHelper.instance.insert('animal_location', {
+        DatabaseHelper.animal_location_id: row['location_id'],
+        DatabaseHelper.animal_location_code: row['code'],
+        DatabaseHelper.animal_location_fst_id: row['farm_site']['farm_sites_id'],
+        DatabaseHelper.animal_location_lcn_type: row['farm_site']['fst_type'],
+        DatabaseHelper.animal_location_date_start : row['date_start'],
+        DatabaseHelper.animal_location_date_end : row['date_end']
       });
     });
 
-    locations = await DatabaseHelper.instance.get('location');
+    locations = await DatabaseHelper.instance.get('animal_location');
 
 //    print(locations);
   }
@@ -126,7 +129,6 @@ class _CompanyLocationScreenState extends State<CompanyLocationScreen> {
     responseJSON.forEach((row) async {
       await DatabaseHelper.instance.insert('round', {
         DatabaseHelper.round_id: row['round_id'],
-        DatabaseHelper.round_uu_id: row['uu_id'],
         DatabaseHelper.round_fst_id: row['farm_site']['farm_sites_id'],
         DatabaseHelper.round_nr: row['nr'],
         DatabaseHelper.round_date_start : row['date_start'],
@@ -153,11 +155,12 @@ class _CompanyLocationScreenState extends State<CompanyLocationScreen> {
 
     List<dynamic> responseJSON = await postData(params, url);
 
+//    print(responseJSON);
+
     responseJSON.forEach((row) async {
       await DatabaseHelper.instance.insert('management_location', {
         DatabaseHelper.management_location_id: row['management_location_id'],
-        DatabaseHelper.management_location_uu_id: row['uu_id'],
-        DatabaseHelper.management_location_location_id: row['location']['location_id'],
+        DatabaseHelper.management_location_animal_location_id: row['location']['location_id'],
         DatabaseHelper.management_location_round_id: row['round']['round_id'],
         DatabaseHelper.management_location_code : row['code'],
         DatabaseHelper.management_location_date_start : row['date_start'],
@@ -187,8 +190,7 @@ class _CompanyLocationScreenState extends State<CompanyLocationScreen> {
     responseJSON.forEach((row) async {
       await DatabaseHelper.instance.insert('observed_animal_count', {
         DatabaseHelper.observed_animal_counts_id: row['animal_count_id'],
-//        DatabaseHelper.observed_animal_counts_uu_id: row['uu_id'],
-        DatabaseHelper.observed_animal_counts_aln_id: row['management_location']['management_location_id'],
+        DatabaseHelper.observed_animal_counts_mln_id: row['management_location']['management_location_id'],
         DatabaseHelper.observed_animal_counts_measurement_date: row['measurement_date'],
         DatabaseHelper.observed_animal_counts_animals_in : row['animals_in'],
         DatabaseHelper.observed_animal_counts_animals_out : row['animals_out'],
@@ -218,8 +220,7 @@ class _CompanyLocationScreenState extends State<CompanyLocationScreen> {
     responseJSON.forEach((row) async {
       await DatabaseHelper.instance.insert('observed_mortality', {
         DatabaseHelper.observed_mortality_id: row['mortality_id'],
-        DatabaseHelper.observed_mortality_uu_id: row['uu_id'],
-        DatabaseHelper.observed_mortality_aln_id: row['management_location']['management_location_id'],
+        DatabaseHelper.observed_mortality_mln_id: row['management_location']['management_location_id'],
         DatabaseHelper.observed_mortality_observation_nr: row['observation_nr'],
         DatabaseHelper.observed_mortality_measurement_date : row['measurement_date'],
         DatabaseHelper.observed_mortality_animals_dead : row['animals_dead'],
@@ -251,8 +252,7 @@ class _CompanyLocationScreenState extends State<CompanyLocationScreen> {
     responseJSON.forEach((row) async {
       await DatabaseHelper.instance.insert('observed_water_uses', {
         DatabaseHelper.observed_water_uses_id: row['water_id'],
-        DatabaseHelper.observed_water_uses_uu_id: row['uu_id'],
-        DatabaseHelper.observed_water_uses_aln_id: row['management_location']['management_location_id'],
+        DatabaseHelper.observed_water_uses_mln_id: row['management_location']['management_location_id'],
         DatabaseHelper.observed_water_uses_measurement_date : row['measurement_date'],
         DatabaseHelper.observed_water_uses_amount: row['amount'],
         DatabaseHelper.observed_water_uses_unit : row['unit'],
@@ -282,13 +282,132 @@ class _CompanyLocationScreenState extends State<CompanyLocationScreen> {
     responseJSON.forEach((row) async {
       await DatabaseHelper.instance.insert('observed_weight', {
         DatabaseHelper.observed_weight_id: row['weight_id'],
-        DatabaseHelper.observed_weight_uu_id: row['uu_id'],
-        DatabaseHelper.observed_weight_aln_id: row['management_location']['management_location_id'],
+        DatabaseHelper.observed_weight_mln_id: row['management_location']['management_location_id'],
         DatabaseHelper.observed_weight_measurement_date : row['measurement_date'],
-        DatabaseHelper.observed_weight_amount: row['weight'],
+        DatabaseHelper.observed_weight_weights: row['weight'],
         DatabaseHelper.observed_weight_unit : row['unit'],
         DatabaseHelper.observed_weight_observed_by : row['user']['user_name'],
       });
+    });
+
+//    observed_water_uses = await DatabaseHelper.instance.get('observed_water_uses');
+
+//    print(observed_water_uses);
+  }
+
+  _getInputTypes() async {
+    List<Map<String, dynamic>> input_types = await DatabaseHelper.instance.get('input_types');
+
+    if(input_types.length > 0){
+      await DatabaseHelper.instance.delete('input_types');
+    }
+
+    String url = "inputtypes/get_all";
+    Map<String, dynamic> params = {
+
+    };
+
+    List<dynamic> responseJSON = await postData(params, url);
+
+    responseJSON.forEach((row) async {
+      await DatabaseHelper.instance.insert('input_types', {
+        DatabaseHelper.input_types_id: row['input_type_id'],
+        DatabaseHelper.input_types_fse_id: row['farm_site']['farm_sites_id'],
+        DatabaseHelper.input_types_ite_type: row['ite_type'],
+        DatabaseHelper.input_types_code : row['code'],
+        DatabaseHelper.input_types_description: row['description'],
+        DatabaseHelper.input_types_uom : row['uom'],
+        DatabaseHelper.input_types_active : row['active'] ? 1 : 0
+      });
+    });
+
+//    observed_water_uses = await DatabaseHelper.instance.get('observed_water_uses');
+
+//    print(observed_water_uses);
+  }
+
+  _getInputUses() async {
+    List<Map<String, dynamic>> observed_input_uses = await DatabaseHelper.instance.get('observed_input_uses');
+
+    if(observed_input_uses.length > 0){
+      await DatabaseHelper.instance.delete('observed_input_uses');
+      await DatabaseHelper.instance.delete('observed_input_types');
+    }
+
+    String url = "observedinputuses/get_all";
+    Map<String, dynamic> params = {
+
+    };
+
+    List<dynamic> responseJSON = await postData(params, url);
+
+//    print(responseJSON);
+
+    responseJSON.forEach((row) async {
+      await DatabaseHelper.instance.insert('observed_input_uses', {
+        DatabaseHelper.observed_input_uses_id: row['input_use_id'],
+        DatabaseHelper.observed_input_uses_mln_id: row['management_location']['management_location_id'],
+        DatabaseHelper.observed_input_uses_oue_type : row['oue_type'],
+        DatabaseHelper.observed_input_uses_measurement_date: row['measurement_date'],
+        DatabaseHelper.observed_input_uses_treatment_nr : row['treatment_nr'],
+        DatabaseHelper.observed_input_uses_total_amount : row['total_amount'],
+        DatabaseHelper.observed_input_uses_unit : row['unit'],
+        DatabaseHelper.observed_input_uses_creation_date: row['createdDate'],
+        DatabaseHelper.observed_input_uses_mutation_date : row['changedDate'],
+        DatabaseHelper.observed_input_uses_observed_by : row['user']['user_name'],
+      });
+
+      if(row['observed_input_type'].length > 0){
+        row['observed_input_type'].forEach((oit) async {
+          await DatabaseHelper.instance.insert('observed_input_types', {
+            DatabaseHelper.observed_input_types_id: oit['observed_input_type_id'],
+            DatabaseHelper.observed_input_types_ite_id: oit['input_type']['input_type_id'],
+            DatabaseHelper.observed_input_types_oue_id : row['input_use_id'],
+            DatabaseHelper.observed_input_types_amount: oit['amount'],
+            DatabaseHelper.observed_input_types_creation_date : oit['createdDate'],
+            DatabaseHelper.observed_input_types_mutation_date : oit['changedDate']
+          });
+        });
+      }
+    });
+
+//    observed_water_uses = await DatabaseHelper.instance.get('observed_water_uses');
+
+//    print(observed_water_uses);
+  }
+
+  _getEggProduction() async {
+    List<Map<String, dynamic>> observed_input_uses = await DatabaseHelper.instance.get('observed_egg_production');
+
+    if(observed_input_uses.length > 0){
+      await DatabaseHelper.instance.delete('observed_egg_production');
+    }
+
+    String url = "eggproduction/get_all";
+    Map<String, dynamic> params = {
+
+    };
+
+    List<dynamic> responseJSON = await postData(params, url);
+
+//    print(responseJSON);
+
+    responseJSON.forEach((row) async {
+      await DatabaseHelper.instance.insert('observed_egg_production', {
+        DatabaseHelper.observed_egg_production_id: row['observed_egg_production_id'],
+        DatabaseHelper.observed_egg_production_mln_id: row['management_location']['management_location_id'],
+        DatabaseHelper.observed_egg_production_measurement_date : row['measurement_date'],
+        DatabaseHelper.observed_egg_production_first_quality: row['first_quality'],
+        DatabaseHelper.observed_egg_production_second_quality : row['second_quality'],
+        DatabaseHelper.observed_egg_production_ground_eggs : row['ground_eggs'],
+        DatabaseHelper.observed_egg_production_egg_weight : row['egg_weight'],
+        DatabaseHelper.observed_egg_production_weight_unit : 'kg',
+        DatabaseHelper.observed_egg_production_creation_date: row['createdDate'],
+        DatabaseHelper.observed_egg_production_mutation_date : row['changedDate'],
+        DatabaseHelper.observed_egg_production_observed_by : row['user']['user_name'],
+      });
+
+
     });
 
 //    observed_water_uses = await DatabaseHelper.instance.get('observed_water_uses');
@@ -300,7 +419,7 @@ class _CompanyLocationScreenState extends State<CompanyLocationScreen> {
     String tableName = 'user';
     int rowsAffected = await DatabaseHelper.instance.delete(tableName);
 
-    tableName = 'location';
+    tableName = 'animal_location';
     rowsAffected = await DatabaseHelper.instance.delete(tableName);
     return rowsAffected;
   }
@@ -317,7 +436,7 @@ class _CompanyLocationScreenState extends State<CompanyLocationScreen> {
       textAlign: TextAlign.center,
       style: TextStyle(
         color: Colors.black,
-        fontSize: MediaQuery.of(context).size.width / 10,
+        fontSize: MediaQuery.of(context).size.width / 12.5,
         fontFamily: "Montserrat",
         fontWeight: FontWeight.bold
       ),

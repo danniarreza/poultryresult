@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:poultryresult/Services/database_helper.dart';
+import 'package:poultryresult/Services/rest_api.dart';
 import 'package:poultryresult/Widgets/dialogs.dart';
 import 'package:poultryresult/Widgets/homescreenappbar.dart';
 import 'package:poultryresult/Widgets/homescreenheader.dart';
 import 'package:poultryresult/Widgets/Sidebar_Main.dart';
 import 'package:intl/intl.dart';
+import 'package:poultryresult/Widgets/observationscreenheader.dart';
 
 class WeightsHomeScreen extends StatefulWidget {
   @override
@@ -27,8 +29,9 @@ class _WeightsHomeScreenState extends State<WeightsHomeScreen> {
   List<Map<String, dynamic>> weightsInspectionList;
 
   bool farmSiteLoaded = false;
+  bool weightsLoaded = false;
 
-  DateTime _selectedDateTime = DateTime.now();
+  DateTime selectedDateTime = DateTime.now();
 
   @override
   void initState() {
@@ -40,13 +43,16 @@ class _WeightsHomeScreenState extends State<WeightsHomeScreen> {
 
   _getFarmSiteInformation() async {
     List<Map<String, dynamic>> users = await DatabaseHelper.instance.get('user');
-    List<Map<String, dynamic>> farm_sites = await DatabaseHelper.instance.getById('farm_sites', users[0]['_farm_sites_id']);
+    List<Map<String, dynamic>> farm_sites = await DatabaseHelper.instance.getWhere('farm_sites', ['_farm_sites_id'], [users[0]['_farm_sites_id']]);
 
-    List<Map<String, dynamic>> management_locations = await DatabaseHelper.instance.getById('management_location', users[0]['_management_location_id']);
-    List<Map<String, dynamic>> locations = await DatabaseHelper.instance.getById('location', management_locations[0]['management_location_location_id']);
+    List<Map<String, dynamic>> management_locations = await DatabaseHelper.instance.getWhere('management_location', ['_management_location_id'], [users[0]['_management_location_id']]);
+
+    List<Map<String, dynamic>> animal_locations = await DatabaseHelper.instance.getWhere('animal_location', ['_animal_location_id'], [management_locations[0]['management_location_animal_location_id']]);
     List<Map<String, dynamic>> rounds = await DatabaseHelper.instance.getById('round', management_locations[0]['management_location_round_id']);
 
-    List<Map<String, dynamic>> observedanimalcounts = await DatabaseHelper.instance.getByReference('observed_animal_count', 'management_location', 'observed_animal_counts_aln_id', management_locations[0]['_management_location_id']);
+    List<Map<String, dynamic>> observedanimalcounts = await DatabaseHelper.instance.getWhere(
+        'observed_animal_count', ['observed_animal_counts_mln_id'], [management_locations[0]['_management_location_id']]
+    );
 
     int animal_count = 0;
 
@@ -56,24 +62,53 @@ class _WeightsHomeScreenState extends State<WeightsHomeScreen> {
 
     Map<String, dynamic> new_management_location = Map<String, dynamic>();
 
-    List<Map<String, dynamic>> weights = await DatabaseHelper.instance.getByReference('observed_weight', 'management_location', 'observed_weight_aln_id', management_locations[0]['_management_location_id']);
-
     new_management_location = {
       ...management_locations[0],
       'animal_count' : animal_count,
-      'location' : locations[0],
+      'location' : animal_locations[0],
       'round' : rounds[0],
 
     };
-
-    print(weights);
 
     setState(() {
       user = users[0];
       farm_site = farm_sites[0];
       management_location = new_management_location;
-      weightsInspectionList = weights;
       farmSiteLoaded = true;
+    });
+
+
+    _getWeightsSelectedDate();
+  }
+
+  _getWeightsSelectedDate() async {
+    setState(() {
+      weightsLoaded = false;
+    });
+
+    List<Map<String, dynamic>> weightsFromDB = await DatabaseHelper.instance.getWhere(
+        'observed_weight',
+        [
+          'observed_weight_mln_id',
+          'observed_weight_measurement_date'
+        ],
+        [
+          management_location['_management_location_id'],
+          DateFormat('yyyy-MM-dd').format(selectedDateTime)
+        ]
+    );
+
+    List<Map<String, dynamic>> weightsDate = List<Map<String, dynamic>>();
+
+    weightsDate.addAll(weightsFromDB);
+
+    Future.delayed(Duration(milliseconds: 250), (){
+      setState(() {
+        setState(() {
+          weightsInspectionList = weightsDate;
+          weightsLoaded = true;
+        });
+      });
     });
   }
 
@@ -217,12 +252,12 @@ class _WeightsHomeScreenState extends State<WeightsHomeScreen> {
                   onPressed: () async {
                     Dialogs.waitingDialog(context, "Fetching...", "Please Wait", false);
 
-                    Future.delayed(Duration(milliseconds: 500), (){
-                      Navigator.pop(context);
-                    });
                     setState(() {
-                      _selectedDateTime = _selectedDateTime.add(Duration(days: -1));
+                      selectedDateTime = selectedDateTime.add(Duration(days: -1));
+                      _getWeightsSelectedDate();
                     });
+
+                    Navigator.pop(context);
                   },
                 ),
               )
@@ -247,18 +282,18 @@ class _WeightsHomeScreenState extends State<WeightsHomeScreen> {
                             if(date != null){
                               Dialogs.waitingDialog(context, "Fetching...", "Please Wait", false);
 
-                              Future.delayed(Duration(milliseconds: 500), (){
-                                Navigator.pop(context);
-                              });
                               setState((){
-                                _selectedDateTime = date;
+                                selectedDateTime = date;
+                                _getWeightsSelectedDate();
                               });
+
+                              Navigator.pop(context);
                             }
                           });
                         },
                         title: Center(
                           child: Text(
-                            DateFormat('dd MMMM yyyy').format(_selectedDateTime),
+                            DateFormat('dd MMMM yyyy').format(selectedDateTime),
                           ),
                         )
                     )
@@ -287,12 +322,12 @@ class _WeightsHomeScreenState extends State<WeightsHomeScreen> {
                 onPressed: (){
                   Dialogs.waitingDialog(context, "Fetching...", "Please Wait", false);
 
-                  Future.delayed(Duration(milliseconds: 500), (){
-                    Navigator.pop(context);
-                  });
                   setState(() {
-                    _selectedDateTime = _selectedDateTime.add(Duration(days: 1));
+                    selectedDateTime = selectedDateTime.add(Duration(days: 1));
+                    _getWeightsSelectedDate();
                   });
+
+                  Navigator.pop(context);
                 },
               ),
             ),
@@ -303,7 +338,7 @@ class _WeightsHomeScreenState extends State<WeightsHomeScreen> {
   }
 
   _buildWeightsInspectionCards(){
-    if(farmSiteLoaded == false){
+    if(weightsLoaded == false){
       return Container(
         margin: EdgeInsets.only(top: 25),
         child: SpinKitThreeBounce(
@@ -311,7 +346,7 @@ class _WeightsHomeScreenState extends State<WeightsHomeScreen> {
             size: 30
         ),
       );
-    } else if(farmSiteLoaded == true){
+    } else if(weightsLoaded == true){
       if(weightsInspectionList.length == 0){
         return Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -328,45 +363,67 @@ class _WeightsHomeScreenState extends State<WeightsHomeScreen> {
               itemCount: weightsInspectionList.length,
               itemBuilder: (BuildContext context, int index){
                 Map dailyObserve = weightsInspectionList[index];
-                return Padding(
-                  padding: EdgeInsets.fromLTRB(20, 0, 20, 10),
-                  child: Card(
-                    elevation: 1.5,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(15),
-                    ),
-                    child: ListTile(
-                      contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-                      onTap: (){
-                        Navigator.pushNamed(context, "/dailyobserveweightsneweditscreen", arguments: {
-                          'observationId': dailyObserve['_observed_weight_id'],
-                          'amountWeight': dailyObserve['observed_weight_amount'],
-                          'inspectionRound': weightsInspectionList.length,
-                          'selectedDateTime' : _selectedDateTime
-                        }).then((reload) => _getFarmSiteInformation());
-                    },
-                      title: GestureDetector(
+                return Dismissible(
+                  key: Key(dailyObserve['_observed_weight_id']),
+                  onDismissed: (direction) async {
+
+                    String url = "weight/delete";
+
+                    Map<String, dynamic> params = {
+                      "weight_id": dailyObserve['_observed_weight_id'],
+                      "user_name" : user['user_name']
+                    };
+
+                    dynamic responseJSON = await postData(params, url);
+
+                    int deletedCount = await DatabaseHelper.instance.deleteWhere('observed_weight', ['_observed_weight_id'], [dailyObserve['_observed_weight_id']]);
+                    print(deletedCount);
+
+                    setState(() {
+                      weightsInspectionList.removeAt(index);
+                    });
+                  },
+                  background: Container(color: Colors.white),
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(20, 0, 20, 10),
+                    child: Card(
+                      elevation: 1.5,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      child: ListTile(
+                        contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 15),
                         onTap: (){
                           Navigator.pushNamed(context, "/dailyobserveweightsneweditscreen", arguments: {
                             'observationId': dailyObserve['_observed_weight_id'],
-                            'amountWeight': dailyObserve['observed_weight_amount'],
+                            'amountWeight': dailyObserve['observed_weight_weights'],
                             'inspectionRound': weightsInspectionList.length,
-                            'selectedDateTime' : _selectedDateTime
+                            'selectedDateTime' : DateTime.parse(dailyObserve['observed_weight_measurement_date'])
                           }).then((reload) => _getFarmSiteInformation());
-                        },
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: <Widget>[
-                            Text(
-                              "Weight [gr] : ${dailyObserve['observed_weight_amount']}",
-                              style: TextStyle(
-                                  color: Colors.black,
-                                  fontFamily: "Montserrat",
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600
+                      },
+                        title: GestureDetector(
+                          onTap: (){
+                            Navigator.pushNamed(context, "/dailyobserveweightsneweditscreen", arguments: {
+                              'observationId': dailyObserve['_observed_weight_id'],
+                              'amountWeight': dailyObserve['observed_weight_weights'],
+                              'inspectionRound': weightsInspectionList.length,
+                              'selectedDateTime' : DateTime.parse(dailyObserve['observed_weight_measurement_date'])
+                            }).then((reload) => _getFarmSiteInformation());
+                          },
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: <Widget>[
+                              Text(
+                                "Weight [gr] : ${dailyObserve['observed_weight_weights']}",
+                                style: TextStyle(
+                                    color: Colors.black,
+                                    fontFamily: "Montserrat",
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     ),
@@ -392,7 +449,7 @@ class _WeightsHomeScreenState extends State<WeightsHomeScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            HomeScreenHeader(),
+            ObservationScreenHeader(),
             Expanded(
               child: Container(
 //                padding: EdgeInsets.symmetric(horizontal: 20),
@@ -426,26 +483,26 @@ class _WeightsHomeScreenState extends State<WeightsHomeScreen> {
                             ),
                             child: Column(
                               children: <Widget>[
+//                                Row(
+//                                  children: <Widget>[
+//                                    Container(
+//                                      padding: EdgeInsets.fromLTRB(30, 20, 30, 5),
+//                                      child: Text(
+//                                        "Daily Observations",
+//                                        style: TextStyle(
+//                                            fontFamily: "Montserrat",
+//                                            fontSize: 20,
+//                                            fontWeight: FontWeight.bold
+//                                        ),
+//                                      ),
+//                                    ),
+//                                  ],
+//                                ),
+//                                _buildHouseInformationCard(),
                                 Row(
                                   children: <Widget>[
                                     Container(
-                                      padding: EdgeInsets.fromLTRB(30, 20, 30, 5),
-                                      child: Text(
-                                        "Daily Observations",
-                                        style: TextStyle(
-                                            fontFamily: "Montserrat",
-                                            fontSize: 20,
-                                            fontWeight: FontWeight.bold
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                _buildHouseInformationCard(),
-                                Row(
-                                  children: <Widget>[
-                                    Container(
-                                      padding: EdgeInsets.fromLTRB(30, 5, 30, 0),
+                                      padding: EdgeInsets.fromLTRB(30, 20, 30, 0),
                                       child: Text(
                                         "Weights",
                                         style: TextStyle(
@@ -472,7 +529,7 @@ class _WeightsHomeScreenState extends State<WeightsHomeScreen> {
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: weightsLoaded == true && weightsInspectionList.length < 1 ? FloatingActionButton(
         child: Icon(Icons.add),
         backgroundColor: Color.fromRGBO(253, 184, 19, 1),
         focusColor: Colors.white,
@@ -480,13 +537,13 @@ class _WeightsHomeScreenState extends State<WeightsHomeScreen> {
           if(weightsInspectionList.length < 1){
             Navigator.pushNamed(context, "/dailyobserveweightsneweditscreen", arguments: {
               'inspectionRound': weightsInspectionList.length + 1,
-              'selectedDateTime' : _selectedDateTime
+              'selectedDateTime' : selectedDateTime
             }).then((reload) => _getFarmSiteInformation());
           } else {
             await Dialogs.errorRetryDialog(context, "Inspection round has reached the limit", "Close", true);
           }
         },
-      ),
+      ) : null,
     );
   }
 }

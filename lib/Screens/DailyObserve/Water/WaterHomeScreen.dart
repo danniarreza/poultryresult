@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:intl/intl.dart';
 import 'package:poultryresult/Services/database_helper.dart';
+import 'package:poultryresult/Services/globalidentifier_generator.dart';
+import 'package:poultryresult/Services/rest_api.dart';
 import 'package:poultryresult/Widgets/dialogs.dart';
 import 'package:poultryresult/Widgets/homescreenappbar.dart';
 import 'package:poultryresult/Widgets/homescreenheader.dart';
 import 'package:poultryresult/Widgets/Sidebar_Main.dart';
+import 'package:poultryresult/Widgets/observationscreenheader.dart';
 
 class WaterHomeScreen extends StatefulWidget {
   @override
@@ -14,11 +17,6 @@ class WaterHomeScreen extends StatefulWidget {
 
 class _WaterHomeScreenState extends State<WaterHomeScreen> {
 
-//  List<Map> waterInspectionList = [
-//    {
-//      "water_amount": 100
-//    }
-//  ];
 
   Map<String, dynamic> user;
   Map<String, dynamic> farm_site;
@@ -26,8 +24,9 @@ class _WaterHomeScreenState extends State<WaterHomeScreen> {
   List<Map<String, dynamic>> waterInspectionList;
 
   bool farmSiteLoaded = false;
+  bool waterLoaded = false;
 
-  DateTime _selectedDateTime = DateTime.now();
+  DateTime selectedDateTime = DateTime.now();
 
   @override
   void initState() {
@@ -39,13 +38,16 @@ class _WaterHomeScreenState extends State<WaterHomeScreen> {
 
   _getFarmSiteInformation() async {
     List<Map<String, dynamic>> users = await DatabaseHelper.instance.get('user');
-    List<Map<String, dynamic>> farm_sites = await DatabaseHelper.instance.getById('farm_sites', users[0]['_farm_sites_id']);
+    List<Map<String, dynamic>> farm_sites = await DatabaseHelper.instance.getWhere('farm_sites', ['_farm_sites_id'], [users[0]['_farm_sites_id']]);
 
-    List<Map<String, dynamic>> management_locations = await DatabaseHelper.instance.getById('management_location', users[0]['_management_location_id']);
-    List<Map<String, dynamic>> locations = await DatabaseHelper.instance.getById('location', management_locations[0]['management_location_location_id']);
+    List<Map<String, dynamic>> management_locations = await DatabaseHelper.instance.getWhere('management_location', ['_management_location_id'], [users[0]['_management_location_id']]);
+
+    List<Map<String, dynamic>> animal_locations = await DatabaseHelper.instance.getWhere('animal_location', ['_animal_location_id'], [management_locations[0]['management_location_animal_location_id']]);
     List<Map<String, dynamic>> rounds = await DatabaseHelper.instance.getById('round', management_locations[0]['management_location_round_id']);
 
-    List<Map<String, dynamic>> observedanimalcounts = await DatabaseHelper.instance.getByReference('observed_animal_count', 'management_location', 'observed_animal_counts_aln_id', management_locations[0]['_management_location_id']);
+    List<Map<String, dynamic>> observedanimalcounts = await DatabaseHelper.instance.getWhere(
+        'observed_animal_count', ['observed_animal_counts_mln_id'], [management_locations[0]['_management_location_id']]
+    );
 
     int animal_count = 0;
 
@@ -55,25 +57,54 @@ class _WaterHomeScreenState extends State<WaterHomeScreen> {
 
     Map<String, dynamic> new_management_location = Map<String, dynamic>();
 
-    List<Map<String, dynamic>> water_uses = await DatabaseHelper.instance.getByReference('observed_water_uses', 'management_location', 'observed_water_uses_aln_id', management_locations[0]['_management_location_id']);
-
     new_management_location = {
       ...management_locations[0],
       'animal_count' : animal_count,
-      'location' : locations[0],
+      'location' : animal_locations[0],
       'round' : rounds[0],
 
     };
-
-    print(water_uses);
 
     setState(() {
       user = users[0];
       farm_site = farm_sites[0];
       management_location = new_management_location;
-      waterInspectionList = water_uses;
       farmSiteLoaded = true;
     });
+
+    _getWaterUsesSelectedDate();
+  }
+
+  _getWaterUsesSelectedDate() async {
+    setState(() {
+      waterLoaded = false;
+    });
+
+    List<Map<String, dynamic>> waterFromDB = await DatabaseHelper.instance.getWhere(
+        'observed_water_uses',
+        [
+          'observed_water_uses_mln_id',
+          'observed_water_uses_measurement_date'
+        ],
+        [
+          management_location['_management_location_id'],
+          DateFormat('yyyy-MM-dd').format(selectedDateTime)
+        ]
+    );
+
+    List<Map<String, dynamic>> waterDate = List<Map<String, dynamic>>();
+
+    waterDate.addAll(waterFromDB);
+
+    Future.delayed(Duration(milliseconds: 250), (){
+      setState(() {
+        setState(() {
+          waterInspectionList = waterDate;
+          waterLoaded = true;
+        });
+      });
+    });
+
   }
 
   _buildHouseInformationCard(){
@@ -94,7 +125,7 @@ class _WaterHomeScreenState extends State<WaterHomeScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
                     Text(
-                      "House : " + user['_location_id'].toString(),
+                      "House : " + user['_animal_location_id'].toString(),
                       style: TextStyle(
                           color: Colors.black,
                           fontFamily: "Montserrat",
@@ -190,7 +221,8 @@ class _WaterHomeScreenState extends State<WaterHomeScreen> {
   _buildWaterDateSelector(){
     return Container(
       height: 57.5,
-      margin: EdgeInsets.symmetric(horizontal: 25, vertical: 10),
+//      margin: EdgeInsets.symmetric(horizontal: 25, vertical: 10),
+      margin: EdgeInsets.symmetric(horizontal: 25, vertical: MediaQuery.of(context).size.height / 100),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: <Widget>[
@@ -216,12 +248,12 @@ class _WaterHomeScreenState extends State<WaterHomeScreen> {
                   onPressed: () async {
                     Dialogs.waitingDialog(context, "Fetching...", "Please Wait", false);
 
-                    Future.delayed(Duration(milliseconds: 500), (){
-                      Navigator.pop(context);
-                    });
                     setState(() {
-                      _selectedDateTime = _selectedDateTime.add(Duration(days: -1));
+                      selectedDateTime = selectedDateTime.add(Duration(days: -1));
+                      _getWaterUsesSelectedDate();
                     });
+
+                    Navigator.pop(context);
                   },
                 ),
               )
@@ -246,18 +278,18 @@ class _WaterHomeScreenState extends State<WaterHomeScreen> {
                             if(date != null){
                               Dialogs.waitingDialog(context, "Fetching...", "Please Wait", false);
 
-                              Future.delayed(Duration(milliseconds: 500), (){
-                                Navigator.pop(context);
-                              });
                               setState((){
-                                _selectedDateTime = date;
+                                selectedDateTime = date;
+                                _getWaterUsesSelectedDate();
                               });
+
+                              Navigator.pop(context);
                             }
                           });
                         },
                         title: Center(
                           child: Text(
-                            DateFormat('dd MMMM yyyy').format(_selectedDateTime),
+                            DateFormat('dd MMMM yyyy').format(selectedDateTime),
                           ),
                         )
                     )
@@ -286,12 +318,12 @@ class _WaterHomeScreenState extends State<WaterHomeScreen> {
                 onPressed: (){
                   Dialogs.waitingDialog(context, "Fetching...", "Please Wait", false);
 
-                  Future.delayed(Duration(milliseconds: 500), (){
-                    Navigator.pop(context);
-                  });
                   setState(() {
-                    _selectedDateTime = _selectedDateTime.add(Duration(days: 1));
+                    selectedDateTime = selectedDateTime.add(Duration(days: 1));
+                    _getWaterUsesSelectedDate();
                   });
+
+                  Navigator.pop(context);
                 },
               ),
             ),
@@ -302,46 +334,52 @@ class _WaterHomeScreenState extends State<WaterHomeScreen> {
   }
 
   _buildWaterCopyPrevious(){
-    return Container(
-      height: 57.5,
-      margin: EdgeInsets.symmetric(horizontal: 25, vertical: 10),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: <Widget>[
-          Flexible(
-              flex: 1,
-              child: Container(
-                child: Card(
-                    elevation: 2,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(15),
-                    ),
-                    child: ListTile(
-                        onTap: (){
-                          print("Tapped Copy Previous");
-                        },
-                        title: Center(
-                          child: Text(
-                            "Copy Previous",
-                            style: TextStyle(
-                                color: Colors.black,
-                                fontFamily: "Montserrat",
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600
+    if(waterLoaded == true && waterInspectionList.length < 1){
+      return Container(
+        height: 57.5,
+//      margin: EdgeInsets.symmetric(horizontal: 25, vertical: 10),
+        margin: EdgeInsets.symmetric(horizontal: 25, vertical: MediaQuery.of(context).size.height / 100),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: <Widget>[
+            Flexible(
+                flex: 1,
+                child: Container(
+                  child: Card(
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      child: ListTile(
+                          onTap: (){
+                            _getPreviousObservation();
+                          },
+                          title: Center(
+                            child: Text(
+                              "Copy Previous",
+                              style: TextStyle(
+                                  color: Colors.black,
+                                  fontFamily: "Montserrat",
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600
+                              ),
                             ),
-                          ),
-                        )
-                    )
-                ),
-              )
-          ),
-        ],
-      ),
-    );
+                          )
+                      )
+                  ),
+                )
+            ),
+          ],
+        ),
+      );
+    } else {
+      return Container();
+    }
+
   }
 
   _buildWaterInspectionCards(){
-    if(farmSiteLoaded == false){
+    if(waterLoaded == false){
       return Container(
         margin: EdgeInsets.only(top: 25),
         child: SpinKitThreeBounce(
@@ -349,7 +387,7 @@ class _WaterHomeScreenState extends State<WaterHomeScreen> {
             size: 30
         ),
       );
-    } else if(farmSiteLoaded == true){
+    } else if(waterLoaded == true){
       if(waterInspectionList.length == 0){
         return Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -366,43 +404,65 @@ class _WaterHomeScreenState extends State<WaterHomeScreen> {
               itemCount: waterInspectionList.length,
               itemBuilder: (BuildContext context, int index){
                 Map dailyObserve = waterInspectionList[index];
-                return Padding(
-                  padding: EdgeInsets.fromLTRB(20, 0, 20, 10),
-                  child: Card(
-                    elevation: 1.5,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(15),
-                    ),
-                    child: ListTile(
-                      contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-                      onTap: (){
-                        Navigator.pushNamed(context, "/dailyobservewaterneweditscreen", arguments: {
-                          'observationId': dailyObserve['_observed_water_uses_id'],
-                          'amountWater': dailyObserve['observed_water_uses_amount'],
-                          'selectedDateTime' : _selectedDateTime
-                        }).then((reload) => _getFarmSiteInformation());
-                      },
-                      title: GestureDetector(
+                return Dismissible(
+                  key: Key(dailyObserve['_observed_water_uses_id']),
+                  onDismissed: (direction) async {
+
+                    String url = "water/delete";
+
+                    Map<String, dynamic> params = {
+                      "water_id": dailyObserve['_observed_water_uses_id'],
+                      "user_name" : user['user_name']
+                    };
+
+                    dynamic responseJSON = await postData(params, url);
+
+                    int deletedCount = await DatabaseHelper.instance.deleteWhere('observed_water_uses', ['_observed_water_uses_id'], [dailyObserve['_observed_water_uses_id']]);
+                    print(deletedCount);
+
+                    setState(() {
+                      waterInspectionList.removeAt(index);
+                    });
+                  },
+                  background: Container(color: Colors.white),
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(20, 0, 20, 10),
+                    child: Card(
+                      elevation: 1.5,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      child: ListTile(
+                        contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 15),
                         onTap: (){
                           Navigator.pushNamed(context, "/dailyobservewaterneweditscreen", arguments: {
                             'observationId': dailyObserve['_observed_water_uses_id'],
                             'amountWater': dailyObserve['observed_water_uses_amount'],
-                            'selectedDateTime' : _selectedDateTime
+                            'selectedDateTime' : DateTime.parse(dailyObserve['observed_water_uses_measurement_date'])
                           }).then((reload) => _getFarmSiteInformation());
                         },
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: <Widget>[
-                            Text(
-                              "Amount : ${dailyObserve['observed_water_uses_amount']}",
-                              style: TextStyle(
-                                  color: Colors.black,
-                                  fontFamily: "Montserrat",
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600
+                        title: GestureDetector(
+                          onTap: (){
+                            Navigator.pushNamed(context, "/dailyobservewaterneweditscreen", arguments: {
+                              'observationId': dailyObserve['_observed_water_uses_id'],
+                              'amountWater': dailyObserve['observed_water_uses_amount'],
+                              'selectedDateTime' : DateTime.parse(dailyObserve['observed_water_uses_measurement_date'])
+                            }).then((reload) => _getFarmSiteInformation());
+                          },
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: <Widget>[
+                              Text(
+                                "Amount : ${dailyObserve['observed_water_uses_amount']}",
+                                style: TextStyle(
+                                    color: Colors.black,
+                                    fontFamily: "Montserrat",
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     ),
@@ -416,6 +476,75 @@ class _WaterHomeScreenState extends State<WaterHomeScreen> {
     }
   }
 
+  _getPreviousObservation() async {
+
+    if(waterInspectionList.length < 1){
+      Dialogs.waitingDialog(context, "Fetching...", "Please Wait", false);
+
+      List<Map<String, dynamic>> waterDate = await DatabaseHelper.instance.getWhere(
+          'observed_water_uses',
+          [
+            'observed_water_uses_mln_id',
+            'observed_water_uses_measurement_date'
+          ],
+          [
+            management_location['_management_location_id'],
+            DateFormat('yyyy-MM-dd').format(selectedDateTime.add(Duration(days: -1)))
+          ]
+      );
+
+      if(waterDate.length != 0){
+        Map<String, dynamic> previousWaterDate = waterDate[0];
+
+        List<Map<String, dynamic>> water_uses = await DatabaseHelper.instance.get('observed_water_uses');
+
+//      int water_id = water_uses.length > 0 ? water_uses[water_uses.length - 1]['_observed_water_uses_id'] + 1 : 1;
+        String water_id = generate_GlobalIdentifier();
+        String management_location_id = management_location['_management_location_id'];
+        String measurement_date = DateFormat('yyyy-MM-dd').format(selectedDateTime);
+        String creation_date = DateFormat("yyyy-MM-dd HH:mm:ss").format(DateTime.now());
+        int water_amount = previousWaterDate['observed_water_uses_amount'];
+        String water_unit = previousWaterDate['observed_water_uses_unit'];
+        String user_name =  user['user_name'];
+
+        int id = await DatabaseHelper.instance.insert('observed_water_uses', {
+          DatabaseHelper.observed_water_uses_id: water_id,
+          DatabaseHelper.observed_water_uses_mln_id: management_location_id,
+          DatabaseHelper.observed_water_uses_measurement_date : measurement_date,
+          DatabaseHelper.observed_water_uses_creation_date : creation_date,
+          DatabaseHelper.observed_water_uses_amount : water_amount,
+          DatabaseHelper.observed_water_uses_unit : water_unit,
+          DatabaseHelper.observed_water_uses_creation_date : creation_date,
+          DatabaseHelper.observed_water_uses_observed_by : user_name
+        });
+
+        String url = "water/insert";
+
+        Map<String, dynamic> params = {
+          "water_id": water_id,
+          "management_location_id" : management_location_id,
+          "measurement_date" : measurement_date,
+          "amount": water_amount,
+          "unit": water_unit,
+          "user_name": user_name
+        };
+
+        dynamic responseJSON = await postData(params, url);
+
+        if(responseJSON['status'] == 'Success'){
+          Navigator.pop(context);
+        }
+        _getWaterUsesSelectedDate();
+      } else {
+        Navigator.pop(context);
+        await Dialogs.errorRetryDialog(context, "No previous observation has been found", "Close", true);
+      }
+
+    } else {
+      await Dialogs.errorRetryDialog(context, "Inspection round has reached the limit", "Close", true);
+    }
+
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -429,7 +558,7 @@ class _WaterHomeScreenState extends State<WaterHomeScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            HomeScreenHeader(),
+            ObservationScreenHeader(),
             Expanded(
               child: Container(
 //                padding: EdgeInsets.symmetric(horizontal: 20),
@@ -463,26 +592,26 @@ class _WaterHomeScreenState extends State<WaterHomeScreen> {
                             ),
                             child: Column(
                               children: <Widget>[
+//                                Row(
+//                                  children: <Widget>[
+//                                    Container(
+//                                      padding: EdgeInsets.fromLTRB(30, 20, 30, 5),
+//                                      child: Text(
+//                                        "Daily Observations",
+//                                        style: TextStyle(
+//                                            fontFamily: "Montserrat",
+//                                            fontSize: 20,
+//                                            fontWeight: FontWeight.bold
+//                                        ),
+//                                      ),
+//                                    ),
+//                                  ],
+//                                ),
+//                                _buildHouseInformationCard(),
                                 Row(
                                   children: <Widget>[
                                     Container(
-                                      padding: EdgeInsets.fromLTRB(30, 20, 30, 5),
-                                      child: Text(
-                                        "Daily Observations",
-                                        style: TextStyle(
-                                            fontFamily: "Montserrat",
-                                            fontSize: 20,
-                                            fontWeight: FontWeight.bold
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                _buildHouseInformationCard(),
-                                Row(
-                                  children: <Widget>[
-                                    Container(
-                                      padding: EdgeInsets.fromLTRB(30, 5, 30, 0),
+                                      padding: EdgeInsets.fromLTRB(30, 20, 30, 0),
                                       child: Text(
                                         "Water",
                                         style: TextStyle(
@@ -510,7 +639,7 @@ class _WaterHomeScreenState extends State<WaterHomeScreen> {
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: waterLoaded == true && waterInspectionList.length < 1 ? FloatingActionButton(
         child: Icon(Icons.add),
         backgroundColor: Color.fromRGBO(253, 184, 19, 1),
         focusColor: Colors.white,
@@ -518,13 +647,13 @@ class _WaterHomeScreenState extends State<WaterHomeScreen> {
           if(waterInspectionList.length < 1){
             Navigator.pushNamed(context, "/dailyobservewaterneweditscreen", arguments: {
               'inspectionRound': 1,
-              'selectedDateTime' : _selectedDateTime
+              'selectedDateTime' : selectedDateTime
             }).then((reload) => _getFarmSiteInformation());
           } else {
             await Dialogs.errorRetryDialog(context, "Inspection round has reached the limit", "Close", true);
           }
         },
-      ),
+      ) : null,
     );
   }
 }
