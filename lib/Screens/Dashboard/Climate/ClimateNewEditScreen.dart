@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
-import 'package:intl/intl.dart';
 import 'package:poultryresult/Services/database_helper.dart';
 import 'package:poultryresult/Services/globalidentifier_generator.dart';
 import 'package:poultryresult/Services/rest_api.dart';
@@ -8,25 +7,26 @@ import 'package:poultryresult/Widgets/Sidebar_Main.dart';
 import 'package:poultryresult/Widgets/dialogs.dart';
 import 'package:poultryresult/Widgets/homescreenappbar.dart';
 import 'package:poultryresult/Widgets/homescreenheader.dart';
+import 'package:intl/intl.dart';
 import 'package:poultryresult/Widgets/observationscreenheader.dart';
 
-class EggsNewEditScreen extends StatefulWidget {
+class ClimateNewEditScreen extends StatefulWidget {
   @override
-  _EggsNewEditScreenState createState() => _EggsNewEditScreenState();
+  _ClimateNewEditScreenState createState() => _ClimateNewEditScreenState();
 }
 
-class _EggsNewEditScreenState extends State<EggsNewEditScreen> {
+class _ClimateNewEditScreenState extends State<ClimateNewEditScreen> {
 
   bool isNew;
 
   DateTime selectedDateTime;
-
   String observationId;
-  int amountFirstQuality;
-  int amountSecondQuality;
-  int amountGroundEggs;
-  double eggWeight;
-  String weightUnit;
+  int inspectionRound;
+  double temperature;
+  double co2;
+  double rh;
+  String temperatureUnit;
+  String co2Unit;
 
   Map<String, dynamic> routeData = {};
   Map<String, dynamic> user;
@@ -36,10 +36,9 @@ class _EggsNewEditScreenState extends State<EggsNewEditScreen> {
   bool farmSiteLoaded = false;
 
   Map<dynamic, bool> warningList = {
-    "amountFirstQualityWarning" : false,
-    "amountSecondQualityWarning": false,
-    "amountGroundEggsWarning": false,
-    "eggWeightWarning": false,
+    "temperatureWarning" : false,
+    "co2Warning" : false,
+    "rhWarning" : false
   };
 
   final GlobalKey<FormState> formKey = GlobalKey<FormState>();
@@ -90,8 +89,6 @@ class _EggsNewEditScreenState extends State<EggsNewEditScreen> {
 
   }
 
-
-
   _buildInspectionInformationCard(){
     return Padding(
       padding: EdgeInsets.fromLTRB(20, 0, 20, 10),
@@ -112,7 +109,7 @@ class _EggsNewEditScreenState extends State<EggsNewEditScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
                       Text(
-                        "Egg Inspection : ",
+                        "Inspection Round : " + inspectionRound.toString(),
                         style: TextStyle(
                             color: Colors.black,
                             fontFamily: "Montserrat",
@@ -199,10 +196,9 @@ class _EggsNewEditScreenState extends State<EggsNewEditScreen> {
                   margin: EdgeInsets.symmetric(vertical: 20),
                   color: Colors.grey,
                 ),
-                _buildEggsFirstQualityForm(),
-                _buildEggsSecondQualityForm(),
-                _buildEggsGroundEggsForm(),
-                _buildEggsWeightForm(),
+                _buildTemperatureForm(),
+                _buildCO2Form(),
+                _buildRHForm(),
                 SizedBox(height: 15,),
                 _buildSubmitButton(),
               ],
@@ -212,13 +208,13 @@ class _EggsNewEditScreenState extends State<EggsNewEditScreen> {
       ),
     );
   }
-  
-  _buildEggsFirstQualityForm(){
+
+  _buildTemperatureForm(){
     return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Text(
-              "First Quality",
+              "Temperature",
               style: TextStyle(
                   fontFamily: "Montserrat",
                   fontSize: 14,
@@ -228,7 +224,7 @@ class _EggsNewEditScreenState extends State<EggsNewEditScreen> {
           SizedBox(height: 10,),
           TextFormField(
             keyboardType: TextInputType.number,
-            initialValue: amountFirstQuality != null ? amountFirstQuality.toString() : null,
+            initialValue: temperature != null ? temperature.toString() : null,
             decoration: InputDecoration(
               filled: true,
               fillColor: Colors.grey[100],
@@ -247,26 +243,26 @@ class _EggsNewEditScreenState extends State<EggsNewEditScreen> {
             validator: (String value) {
               if(value == null || value == ''){
                 setState(() {
-                  warningList["amountFirstQualityWarning"] = true;
+                  warningList["temperatureWarning"] = true;
                 });
                 return null;
               } else {
                 setState(() {
-                  warningList["amountFirstQualityWarning"] = false;
+                  warningList["temperatureWarning"] = false;
                 });
                 return null;
               }
             },
             onSaved: (String value){
               setState(() {
-                amountFirstQuality = int.parse(value);
+                temperature = double.parse(value);
               });
             },
           ),
-          warningList["amountFirstQualityWarning"] == true ? Container(
+          warningList["temperatureWarning"] == true ? Container(
             padding: EdgeInsets.only(left: 5, top: 10),
             child: Text(
-              "Please fill in amount",
+              "Please fill in temperature",
               style: TextStyle(
                   fontSize: 14,
                   color: Colors.red
@@ -278,12 +274,12 @@ class _EggsNewEditScreenState extends State<EggsNewEditScreen> {
     );
   }
 
-  _buildEggsSecondQualityForm(){
+  _buildCO2Form(){
     return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Text(
-              "Second Quality",
+              "CO2",
               style: TextStyle(
                   fontFamily: "Montserrat",
                   fontSize: 14,
@@ -293,7 +289,7 @@ class _EggsNewEditScreenState extends State<EggsNewEditScreen> {
           SizedBox(height: 10,),
           TextFormField(
             keyboardType: TextInputType.number,
-            initialValue: amountSecondQuality != null ? amountSecondQuality.toString() : null,
+            initialValue: co2 != null ? co2.toString() : null,
             decoration: InputDecoration(
               filled: true,
               fillColor: Colors.grey[100],
@@ -309,29 +305,29 @@ class _EggsNewEditScreenState extends State<EggsNewEditScreen> {
                 borderRadius: BorderRadius.all(Radius.circular(15)),
               ),
             ),
+            onSaved: (String value){
+              setState(() {
+                co2 = double.parse(value);
+              });
+            },
             validator: (String value) {
               if(value == null || value == ''){
                 setState(() {
-                  warningList["amountSecondQualityWarning"] = true;
+                  warningList["co2Warning"] = true;
                 });
                 return null;
               } else {
                 setState(() {
-                  warningList["amountSecondQualityWarning"] = false;
+                  warningList["co2Warning"] = false;
                 });
                 return null;
               }
             },
-            onSaved: (String value){
-              setState(() {
-                amountSecondQuality = int.parse(value);
-              });
-            },
           ),
-          warningList["amountSecondQualityWarning"] == true ? Container(
+          warningList["co2Warning"] == true ? Container(
             padding: EdgeInsets.only(left: 5, top: 10),
             child: Text(
-              "Please fill in amount",
+              "Please fill in co2",
               style: TextStyle(
                   fontSize: 14,
                   color: Colors.red
@@ -343,12 +339,12 @@ class _EggsNewEditScreenState extends State<EggsNewEditScreen> {
     );
   }
 
-  _buildEggsGroundEggsForm(){
+  _buildRHForm(){
     return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Text(
-              "Ground Eggs",
+              "Relative Humidity",
               style: TextStyle(
                   fontFamily: "Montserrat",
                   fontSize: 14,
@@ -358,7 +354,7 @@ class _EggsNewEditScreenState extends State<EggsNewEditScreen> {
           SizedBox(height: 10,),
           TextFormField(
             keyboardType: TextInputType.number,
-            initialValue: amountGroundEggs != null ? amountGroundEggs.toString() : null,
+            initialValue: rh != null ? rh.toString() : null,
             decoration: InputDecoration(
               filled: true,
               fillColor: Colors.grey[100],
@@ -374,94 +370,29 @@ class _EggsNewEditScreenState extends State<EggsNewEditScreen> {
                 borderRadius: BorderRadius.all(Radius.circular(15)),
               ),
             ),
+            onSaved: (String value){
+              setState(() {
+                rh = double.parse(value);
+              });
+            },
             validator: (String value) {
               if(value == null || value == ''){
                 setState(() {
-                  warningList["amountGroundEggsWarning"] = true;
+                  warningList["rhWarning"] = true;
                 });
                 return null;
               } else {
                 setState(() {
-                  warningList["amountGroundEggsWarning"] = false;
+                  warningList["rhWarning"] = false;
                 });
                 return null;
               }
             },
-            onSaved: (String value){
-              setState(() {
-                amountGroundEggs = int.parse(value);
-              });
-            },
           ),
-          warningList["amountGroundEggsWarning"] == true ? Container(
+          warningList["rhWarning"] == true ? Container(
             padding: EdgeInsets.only(left: 5, top: 10),
             child: Text(
-              "Please fill in amount",
-              style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.red
-              ),
-            ),
-          ) : SizedBox(height: 0,),
-          SizedBox(height: 10,),
-        ]
-    );
-  }
-
-  _buildEggsWeightForm(){
-    return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Text(
-              "Egg Weight [" + weightUnit + "]",
-              style: TextStyle(
-                  fontFamily: "Montserrat",
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600
-              )
-          ),
-          SizedBox(height: 10,),
-          TextFormField(
-            keyboardType: TextInputType.number,
-            initialValue: eggWeight != null ? eggWeight.toString() : null,
-            decoration: InputDecoration(
-              filled: true,
-              fillColor: Colors.grey[100],
-              hintText: "Insert Weight",
-              isDense: true,
-              contentPadding: EdgeInsets.symmetric(vertical: 12.5, horizontal: 12.5),
-              enabledBorder: OutlineInputBorder(
-                borderSide: BorderSide(color: Colors.transparent),
-                borderRadius: BorderRadius.all(Radius.circular(15)),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderSide: BorderSide(color: Colors.transparent),
-                borderRadius: BorderRadius.all(Radius.circular(15)),
-              ),
-            ),
-            validator: (String value) {
-              if(value == null || value == ''){
-                setState(() {
-                  warningList["eggWeightWarning"] = true;
-                });
-                return null;
-              } else {
-                setState(() {
-                  warningList["eggWeightWarning"] = false;
-                });
-                return null;
-              }
-            },
-            onSaved: (String value){
-              setState(() {
-                eggWeight = double.parse(value);
-              });
-            },
-          ),
-          warningList["eggWeightWarning"] == true ? Container(
-            padding: EdgeInsets.only(left: 5, top: 10),
-            child: Text(
-              "Please fill in weight",
+              "Please fill in rh",
               style: TextStyle(
                   fontSize: 14,
                   color: Colors.red
@@ -491,7 +422,6 @@ class _EggsNewEditScreenState extends State<EggsNewEditScreen> {
 
         if(formClear == true){
           formKey.currentState.save();
-          print("Saved");
           formSubmit();
         }
       },
@@ -530,42 +460,55 @@ class _EggsNewEditScreenState extends State<EggsNewEditScreen> {
     String management_location_id = management_location['_management_location_id'];
     String measurement_date = DateFormat('yyyy-MM-dd').format(selectedDateTime);
     String creation_date = DateFormat("yyyy-MM-dd HH:mm:ss").format(DateTime.now());
-    int first_quality = amountFirstQuality;
-    int second_quality = amountSecondQuality;
-    int ground_eggs = amountGroundEggs;
-    double egg_weight = eggWeight;
+    int observationNr = inspectionRound;
+    double temperature_local = temperature;
+    String temperature_unit_local = "Celcius";
+    double co2_local = co2;
+    String co2_unit_local = "PPM";
+    double rh_local = rh;
     String user_name =  user['user_name'];
 
     if(isNew == true){
-      String new_observed_egg_production_id = generate_GlobalIdentifier();
+//      List<Map<String, dynamic>> mortalities = await DatabaseHelper.instance.get('observed_mortality');
+//      int mortality_id = mortalities[mortalities.length - 1]['_observed_mortality_id'] + 1;
 
+      String climate_id = generate_GlobalIdentifier();
+      print("ID:" + climate_id);
 
-      int id = await DatabaseHelper.instance.insert('observed_egg_production', {
-        DatabaseHelper.observed_egg_production_id: new_observed_egg_production_id,
-        DatabaseHelper.observed_egg_production_mln_id: management_location_id,
-        DatabaseHelper.observed_egg_production_measurement_date : measurement_date,
-        DatabaseHelper.observed_egg_production_first_quality: first_quality,
-        DatabaseHelper.observed_egg_production_second_quality : second_quality,
-        DatabaseHelper.observed_egg_production_ground_eggs : ground_eggs,
-        DatabaseHelper.observed_egg_production_egg_weight : egg_weight,
-        DatabaseHelper.observed_egg_production_weight_unit : weightUnit,
-        DatabaseHelper.observed_egg_production_creation_date: creation_date,
-        DatabaseHelper.observed_egg_production_mutation_date : creation_date,
-        DatabaseHelper.observed_egg_production_observed_by : user_name,
+//      print(mortality_id);
+//      print(animals_dead);
+//      print(animals_culling);
+
+      int id = await DatabaseHelper.instance.insert('observed_climate', {
+        DatabaseHelper.observed_climate_id: climate_id,
+        DatabaseHelper.observed_climate_mln_id: management_location_id,
+        DatabaseHelper.observed_climate_measurement_date : measurement_date,
+        DatabaseHelper.observed_climate_measurement_nr: observationNr,
+        DatabaseHelper.observed_climate_temperature : temperature_local,
+        DatabaseHelper.observed_climate_temperature_unit : temperature_unit_local,
+        DatabaseHelper.observed_climate_rh : rh_local,
+        DatabaseHelper.observed_climate_co2 : co2_local,
+        DatabaseHelper.observed_climate_co2_unit : co2_unit_local,
+        DatabaseHelper.observed_climate_creation_date: creation_date,
+        DatabaseHelper.observed_climate_mutation_date : creation_date,
+        DatabaseHelper.observed_climate_observed_by : user_name,
       });
 
 //      print(id);
 
-      String url = "eggproduction/insert";
+      String url = "observedclimate/insert";
 
       Map<String, dynamic> params = {
-        "observed_egg_production_id": new_observed_egg_production_id,
+        "climate_id": climate_id,
         "management_location_id" : management_location_id,
         "measurement_date" : measurement_date,
-        "first_quality": first_quality,
-        "second_quality": second_quality,
-        "ground_quality": ground_eggs,
-        "egg_weight": egg_weight,
+        "measurement_nr" : observationNr,
+        "creation_date": creation_date,
+        "temperature": temperature_local,
+        "temperature_unit": temperature_unit_local,
+        "co2": co2_local,
+        "co2_unit": co2_unit_local,
+        "rh": rh_local,
         "user_name": user_name
       };
 
@@ -578,30 +521,34 @@ class _EggsNewEditScreenState extends State<EggsNewEditScreen> {
 
 
     } else if(isNew == false){
-      String new_observed_egg_production_id = observationId;
-      await DatabaseHelper.instance.update('observed_egg_production', {
-        DatabaseHelper.observed_egg_production_id: new_observed_egg_production_id,
-        DatabaseHelper.observed_egg_production_mln_id: management_location_id,
-        DatabaseHelper.observed_egg_production_measurement_date : measurement_date,
-        DatabaseHelper.observed_egg_production_first_quality: first_quality,
-        DatabaseHelper.observed_egg_production_second_quality : second_quality,
-        DatabaseHelper.observed_egg_production_ground_eggs : ground_eggs,
-        DatabaseHelper.observed_egg_production_egg_weight : egg_weight,
-        DatabaseHelper.observed_egg_production_weight_unit : weightUnit,
-        DatabaseHelper.observed_egg_production_creation_date: creation_date,
-        DatabaseHelper.observed_egg_production_observed_by : user_name,
+      String climate_id = observationId.toString();
+      await DatabaseHelper.instance.update('observed_climate', {
+        DatabaseHelper.observed_climate_id: climate_id,
+        DatabaseHelper.observed_climate_mln_id: management_location_id,
+        DatabaseHelper.observed_climate_measurement_date : measurement_date,
+        DatabaseHelper.observed_climate_measurement_nr: observationNr,
+        DatabaseHelper.observed_climate_temperature : temperature_local,
+        DatabaseHelper.observed_climate_temperature_unit : temperature_unit_local,
+        DatabaseHelper.observed_climate_rh : rh_local,
+        DatabaseHelper.observed_climate_co2 : co2_local,
+        DatabaseHelper.observed_climate_co2_unit : co2_unit_local,
+        DatabaseHelper.observed_climate_mutation_date : creation_date,
+        DatabaseHelper.observed_climate_observed_by : user_name,
       });
 
-      String url = "eggproduction/update";
+      String url = "observedclimate/update";
 
       Map<String, dynamic> params = {
-        "observed_egg_production_id": new_observed_egg_production_id,
+        "climate_id": climate_id,
         "management_location_id" : management_location_id,
         "measurement_date" : measurement_date,
-        "first_quality": first_quality,
-        "second_quality": second_quality,
-        "ground_quality": ground_eggs,
-        "egg_weight": egg_weight,
+        "measurement_nr" : observationNr,
+        "creation_date": creation_date,
+        "temperature": temperature_local,
+        "temperature_unit": temperature_unit_local,
+        "co2": co2_local,
+        "co2_unit": co2_unit_local,
+        "rh": rh_local,
         "user_name": user_name
       };
 
@@ -614,24 +561,20 @@ class _EggsNewEditScreenState extends State<EggsNewEditScreen> {
 
     }
 
-
-
   }
 
   @override
   Widget build(BuildContext context) {
-
     routeData = ModalRoute.of(context).settings.arguments;
 
     setState(() {
       routeData['observationId'] != null ? isNew = false : isNew = true;
       routeData['observationId'] != null ? observationId = routeData['observationId'] : null;
-      routeData['amountFirstQuality'] != null ? amountFirstQuality = routeData['amountFirstQuality'] : null;
-      routeData['amountSecondQuality'] != null ? amountSecondQuality = routeData['amountSecondQuality'] : null;
-      routeData['amountGroundEggs'] != null ? amountGroundEggs = routeData['amountGroundEggs'] : null;
-      routeData['eggWeight'] != null ? eggWeight = routeData['eggWeight'] : null;
-      routeData['weightUnit'] != null ? weightUnit = routeData['weightUnit'] : weightUnit = 'kg';
+      routeData['temperature'] != null ? temperature = routeData['temperature'] : null;
+      routeData['co2'] != null ? co2 = routeData['co2'] : null;
+      routeData['rh'] != null ? rh = routeData['rh'] : null;
       selectedDateTime = routeData['selectedDateTime'];
+      inspectionRound = routeData['inspectionRound'];
     });
 
     return Scaffold(
@@ -672,7 +615,7 @@ class _EggsNewEditScreenState extends State<EggsNewEditScreen> {
                               Container(
                                 padding: EdgeInsets.fromLTRB(30, 20, 30, 5),
                                 child: Text(
-                                  "Eggs",
+                                  "House Climate",
                                   style: TextStyle(
                                       fontFamily: "Montserrat",
                                       fontSize: 20,

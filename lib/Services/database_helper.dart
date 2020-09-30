@@ -135,6 +135,20 @@ class DatabaseHelper{
   static final observed_egg_production_mutation_date = 'observed_egg_production_mutation_date';
   static final observed_egg_production_observed_by = 'observed_egg_production_observed_by';
 
+  static final _observed_climate_table = 'observed_climate';
+  static final observed_climate_id = '_observed_climate_id';
+  static final observed_climate_mln_id = 'observed_climate_mln_id';
+  static final observed_climate_measurement_date = 'observed_climate_measurement_date';
+  static final observed_climate_measurement_nr = 'observed_climate_measurement_nr';
+  static final observed_climate_temperature = 'observed_climate_temperature';
+  static final observed_climate_temperature_unit = 'observed_climate_temperature_unit';
+  static final observed_climate_rh = 'observed_climate_rh';
+  static final observed_climate_co2 = 'observed_climate_co2';
+  static final observed_climate_co2_unit = 'observed_climate_co2_unit';
+  static final observed_climate_creation_date = 'observed_climate_creation_date';
+  static final observed_climate_mutation_date = 'observed_climate_mutation_date';
+  static final observed_climate_observed_by = 'observed_climate_observed_by';
+
   DatabaseHelper._privateConstructor();
   static final DatabaseHelper instance = DatabaseHelper._privateConstructor();
 
@@ -341,6 +355,25 @@ class DatabaseHelper{
       $observed_egg_production_creation_date TEXT,
       $observed_egg_production_mutation_date TEXT,
       $observed_egg_production_observed_by TEXT
+      );
+      '''
+    );
+
+    db.execute(
+        '''
+      CREATE TABLE $_observed_climate_table(
+      $observed_climate_id TEXT PRIMARY KEY,
+      $observed_climate_mln_id TEXT NOT NULL,
+      $observed_climate_measurement_date TEXT,
+      $observed_climate_measurement_nr INTEGER,
+      $observed_climate_temperature DOUBLE,
+      $observed_climate_temperature_unit TEXT,
+      $observed_climate_rh DOUBLE,
+      $observed_climate_co2 DOUBLE,
+      $observed_climate_co2_unit TEXT,
+      $observed_climate_creation_date TEXT,
+      $observed_climate_mutation_date TEXT,
+      $observed_climate_observed_by TEXT
       );
       '''
     );

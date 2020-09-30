@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:poultryresult/Screens/DailyObserve/DailyObserveHomeScreen.dart';
+import 'package:poultryresult/Screens/Dashboard/DashboardDetailScreen.dart';
 import 'package:poultryresult/Screens/Dashboard/DashboardHomeScreen.dart';
 
 class SidebarMenu extends StatefulWidget {
@@ -58,7 +59,7 @@ class _SidebarMenuState extends State<SidebarMenu> {
 //              Navigator.pushReplacementNamed(context, "/chickensinhomescreen");
               Navigator.pushReplacement(context, PageRouteBuilder(
                 pageBuilder: (context, animation1, animation2){
-                  return DashboardHomeScreen();
+                  return DashboardDetailScreen();
                 },
                 transitionDuration: Duration(seconds: 0),
               )

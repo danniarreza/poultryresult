@@ -19,6 +19,8 @@ import 'package:poultryresult/Screens/DailyObserve/Water/WaterHomeScreen.dart';
 import 'package:poultryresult/Screens/DailyObserve/Water/WaterNewEditScreen.dart';
 import 'package:poultryresult/Screens/DailyObserve/Weight/WeightsHomeScreen.dart';
 import 'package:poultryresult/Screens/DailyObserve/Weight/WeightsNewEditScreen.dart';
+import 'package:poultryresult/Screens/Dashboard/Climate/ClimateHomeScreen.dart';
+import 'package:poultryresult/Screens/Dashboard/Climate/ClimateNewEditScreen.dart';
 import 'package:poultryresult/Screens/Dashboard/DashboardDetailScreen.dart';
 import 'package:poultryresult/Screens/Dashboard/DashboardHomeScreen.dart';
 import 'package:poultryresult/Screens/Landing/CompanyLocationScreen.dart';
@@ -55,6 +57,8 @@ class MyApp extends StatelessWidget {
         "/companylocation": (context) => CompanyLocationScreen(),
         "/dashboardhomescreen": (context) => DashboardHomeScreen(),
         "/dashboarddetailscreen": (context) => DashboardDetailScreen(),
+        "/climatehomescreen": (context) => ClimateHomeScreen(),
+        "/climateneweditscreen": (context) => ClimateNewEditScreen(),
         "/dailyobservehomescreen": (context) => DailyObserveHomeScreen(),
         "/dailyobservehousedetailscreen": (context) => DailyObserveHouseDetailScreen(),
         "/dailyobservemortalityhomescreen": (context) => MortalityHomeScreen(),

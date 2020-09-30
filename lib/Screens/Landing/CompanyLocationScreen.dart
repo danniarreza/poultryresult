@@ -50,6 +50,7 @@ class _CompanyLocationScreenState extends State<CompanyLocationScreen> {
     _getInputTypes();
     _getInputUses();
     _getEggProduction();
+    _getObservedClimate();
 
     List<Map<String, dynamic>> rows = await DatabaseHelper.instance.get('farm_sites');
 
@@ -405,6 +406,46 @@ class _CompanyLocationScreenState extends State<CompanyLocationScreen> {
         DatabaseHelper.observed_egg_production_creation_date: row['createdDate'],
         DatabaseHelper.observed_egg_production_mutation_date : row['changedDate'],
         DatabaseHelper.observed_egg_production_observed_by : row['user']['user_name'],
+      });
+
+
+    });
+
+//    observed_water_uses = await DatabaseHelper.instance.get('observed_water_uses');
+
+//    print(observed_water_uses);
+  }
+
+  _getObservedClimate() async {
+    List<Map<String, dynamic>> observed_climates = await DatabaseHelper.instance.get('observed_climate');
+
+    if(observed_climates.length > 0){
+      await DatabaseHelper.instance.delete('observed_climate');
+    }
+
+    String url = "observedclimate/get_all";
+    Map<String, dynamic> params = {
+
+    };
+
+    List<dynamic> responseJSON = await postData(params, url);
+
+//    print(responseJSON);
+
+    responseJSON.forEach((row) async {
+      await DatabaseHelper.instance.insert('observed_climate', {
+        DatabaseHelper.observed_climate_id: row['climate_id'],
+        DatabaseHelper.observed_climate_mln_id: row['management_location']['management_location_id'],
+        DatabaseHelper.observed_climate_measurement_date : row['measurement_date'],
+        DatabaseHelper.observed_climate_measurement_nr: row['measurement_nr'],
+        DatabaseHelper.observed_climate_temperature : row['temperature'],
+        DatabaseHelper.observed_climate_temperature_unit : row['temperature_unit'],
+        DatabaseHelper.observed_climate_rh : row['rh'],
+        DatabaseHelper.observed_climate_co2 : row['co2'],
+        DatabaseHelper.observed_climate_co2_unit : row['co2_unit'],
+        DatabaseHelper.observed_climate_creation_date: row['createdDate'],
+        DatabaseHelper.observed_climate_mutation_date : row['changedDate'],
+        DatabaseHelper.observed_climate_observed_by : row['user']['user_name'],
       });
 
 

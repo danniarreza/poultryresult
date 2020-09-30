@@ -9,20 +9,20 @@ import 'package:poultryresult/Widgets/Sidebar_Main.dart';
 import 'package:intl/intl.dart';
 import 'package:poultryresult/Widgets/observationscreenheader.dart';
 
-class MortalityHomeScreen extends StatefulWidget {
+class ClimateHomeScreen extends StatefulWidget {
   @override
-  _MortalityHomeScreenState createState() => _MortalityHomeScreenState();
+  _ClimateHomeScreenState createState() => _ClimateHomeScreenState();
 }
 
-class _MortalityHomeScreenState extends State<MortalityHomeScreen> {
+class _ClimateHomeScreenState extends State<ClimateHomeScreen> {
 
   Map<String, dynamic> user;
   Map<String, dynamic> farm_site;
   Map<String, dynamic> management_location;
-  List<Map<String, dynamic>> mortalityInspectionList;
+  List<Map<String, dynamic>> climateInspectionList;
 
   bool farmSiteLoaded = false;
-  bool mortalityLoaded = false;
+  bool climateLoaded = false;
 
   DateTime selectedDateTime = DateTime.now();
 
@@ -70,22 +70,22 @@ class _MortalityHomeScreenState extends State<MortalityHomeScreen> {
       farmSiteLoaded = true;
     });
 
-    _getMortalitiesSelectedDate();
+    _getClimateSelectedDate();
   }
 
-  _getMortalitiesSelectedDate() async {
+  _getClimateSelectedDate() async {
     setState(() {
-      mortalityLoaded = false;
+      climateLoaded = false;
     });
 
-    print(management_location['_management_location_id']);
-    print(DateFormat('yyyy-MM-dd').format(selectedDateTime));
+//    print(management_location['_management_location_id']);
+//    print(DateFormat('yyyy-MM-dd').format(selectedDateTime));
 
-    List<Map<String, dynamic>> mortalitiesFromDB = await DatabaseHelper.instance.getWhere(
-        'observed_mortality',
+    List<Map<String, dynamic>> climatesFromDB = await DatabaseHelper.instance.getWhere(
+        'observed_climate',
         [
-          'observed_mortality_mln_id',
-          'observed_mortality_measurement_date'
+          'observed_climate_mln_id',
+          'observed_climate_measurement_date'
         ],
         [
           management_location['_management_location_id'],
@@ -93,22 +93,24 @@ class _MortalityHomeScreenState extends State<MortalityHomeScreen> {
         ]
     );
 
-    List<Map<String, dynamic>> mortalitiesDate = List<Map<String, dynamic>>();
+    List<Map<String, dynamic>> climatesDate = List<Map<String, dynamic>>();
 
-    mortalitiesDate.addAll(mortalitiesFromDB);
+    climatesDate.addAll(climatesFromDB);
 
-//    print(mortalitiesDate);
+//    print(climatesDate);
 
     Future.delayed(Duration(milliseconds: 250), (){
       setState(() {
-        mortalityInspectionList = mortalitiesDate;
-        mortalityLoaded = true;
+        setState(() {
+          climateInspectionList = climatesDate;
+          climateLoaded = true;
+        });
       });
     });
 
   }
 
-  _buildMortalityDateSelector(){
+  _buildClimateDateSelector(){
     return Container(
       height: 57.5,
       margin: EdgeInsets.symmetric(horizontal: 25, vertical: 10),
@@ -120,8 +122,8 @@ class _MortalityHomeScreenState extends State<MortalityHomeScreen> {
               child: Container(
                 margin: EdgeInsets.only(right: MediaQuery.of(context).size.width / 100),
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(15),
-                  color: Colors.white,
+                    borderRadius: BorderRadius.circular(15),
+                    color: Colors.white,
                     boxShadow: [
                       BoxShadow(
                           color: Colors.grey.withOpacity(0.5),
@@ -139,7 +141,7 @@ class _MortalityHomeScreenState extends State<MortalityHomeScreen> {
 
                     setState(() {
                       selectedDateTime = selectedDateTime.add(Duration(days: -1));
-                      _getMortalitiesSelectedDate();
+                      _getClimateSelectedDate();
                     });
 
                     Navigator.pop(context);
@@ -156,31 +158,31 @@ class _MortalityHomeScreenState extends State<MortalityHomeScreen> {
                       borderRadius: BorderRadius.circular(15),
                     ),
                     child: ListTile(
-                      onTap: (){
-                        showDatePicker(
-                          context: context,
-                          initialDate: DateTime.now(),
-                          firstDate: DateTime(2010),
-                          lastDate: DateTime(2030),
-                        ).then((date) {
-                          print(date);
-                          if(date != null){
-                            Dialogs.waitingDialog(context, "Fetching...", "Please Wait", false);
+                        onTap: (){
+                          showDatePicker(
+                            context: context,
+                            initialDate: DateTime.now(),
+                            firstDate: DateTime(2010),
+                            lastDate: DateTime(2030),
+                          ).then((date) {
+                            print(date);
+                            if(date != null){
+                              Dialogs.waitingDialog(context, "Fetching...", "Please Wait", false);
 
-                            setState((){
-                              selectedDateTime = date;
-                              _getMortalitiesSelectedDate();
-                            });
+                              setState((){
+                                selectedDateTime = date;
+                                _getClimateSelectedDate();
+                              });
 
-                            Navigator.pop(context);
-                          }
-                        });
-                      },
-                      title: Center(
-                        child: Text(
-                          DateFormat('dd MMMM yyyy').format(selectedDateTime),
-                        ),
-                      )
+                              Navigator.pop(context);
+                            }
+                          });
+                        },
+                        title: Center(
+                          child: Text(
+                            DateFormat('dd MMMM yyyy').format(selectedDateTime),
+                          ),
+                        )
                     )
                 ),
               )
@@ -209,7 +211,7 @@ class _MortalityHomeScreenState extends State<MortalityHomeScreen> {
 
                   setState(() {
                     selectedDateTime = selectedDateTime.add(Duration(days: 1));
-                    _getMortalitiesSelectedDate();
+                    _getClimateSelectedDate();
                   });
 
                   Navigator.pop(context);
@@ -222,8 +224,8 @@ class _MortalityHomeScreenState extends State<MortalityHomeScreen> {
     );
   }
 
-  _buildMortalityInspectionCards(){
-    if(mortalityLoaded == false){
+  _buildClimateInspectionCards(){
+    if(climateLoaded == false){
       return Container(
         margin: EdgeInsets.only(top: 25),
         child: SpinKitThreeBounce(
@@ -231,8 +233,8 @@ class _MortalityHomeScreenState extends State<MortalityHomeScreen> {
             size: 30
         ),
       );
-    } else if(mortalityLoaded == true){
-      if(mortalityInspectionList.length == 0){
+    } else if(climateLoaded == true){
+      if(climateInspectionList.length == 0){
         return Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
@@ -241,31 +243,31 @@ class _MortalityHomeScreenState extends State<MortalityHomeScreen> {
                 child: Text("No data found")),
           ],
         );
-      } else if(mortalityInspectionList.length > 0){
+      } else if(climateInspectionList.length > 0){
         return Expanded(
           child: Container(
             child: ListView.builder(
-              itemCount: mortalityInspectionList.length,
+              itemCount: climateInspectionList.length,
               itemBuilder: (BuildContext context, int index){
-                Map dailyObserve = mortalityInspectionList[index];
+                Map dailyObserve = climateInspectionList[index];
                 return Dismissible(
-                  key: Key(dailyObserve['_observed_mortality_id']),
+                  key: Key(dailyObserve['_observed_climate_id']),
                   onDismissed: (direction) async {
 
-                    String url = "mortality/delete";
+                    String url = "observedclimate/delete";
 
                     Map<String, dynamic> params = {
-                      "mortality_id": dailyObserve['_observed_mortality_id'],
+                      "climate_id": dailyObserve['_observed_climate_id'],
                       "user_name" : user['user_name']
                     };
 
                     dynamic responseJSON = await postData(params, url);
 
-                    int deletedCount = await DatabaseHelper.instance.deleteWhere('observed_mortality', ['_observed_mortality_id'], [dailyObserve['_observed_mortality_id']]);
+                    int deletedCount = await DatabaseHelper.instance.deleteWhere('observed_climate', ['_observed_climate_id'], [dailyObserve['_observed_climate_id']]);
                     print(deletedCount);
 
                     setState(() {
-                      mortalityInspectionList.removeAt(index);
+                      climateInspectionList.removeAt(index);
                     });
                   },
                   background: Container(color: Colors.white),
@@ -279,31 +281,31 @@ class _MortalityHomeScreenState extends State<MortalityHomeScreen> {
                       child: ListTile(
                         contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 15),
                         onTap: () async {
-                          Navigator.pushNamed(context, "/dailyobservemortalityneweditscreen", arguments: {
-                            'observationId': dailyObserve['_observed_mortality_id'],
-                            'amountCulling': dailyObserve['observed_mortality_animals_selection'],
-                            'amountDeath': dailyObserve['observed_mortality_animals_dead'],
-                            'inputRemark': dailyObserve['observed_mortality_remark'],
-                            'inspectionRound': mortalityInspectionList.length,
-                            'selectedDateTime' : DateTime.parse(dailyObserve['observed_mortality_measurement_date'])
+                          Navigator.pushNamed(context, "/climateneweditscreen", arguments: {
+                            'observationId': dailyObserve['_observed_climate_id'],
+                            'temperature': dailyObserve['observed_climate_temperature'],
+                            'co2': dailyObserve['observed_climate_co2'],
+                            'rh': dailyObserve['observed_climate_rh'],
+                            'inspectionRound': climateInspectionList.length,
+                            'selectedDateTime' : DateTime.parse(dailyObserve['observed_climate_measurement_date'])
                           }).then((reload) => _getFarmSiteInformation());
                         },
                         title: GestureDetector(
                           onTap: () async {
-                            Navigator.pushNamed(context, "/dailyobservemortalityneweditscreen", arguments: {
-                              'observationId': dailyObserve['_observed_mortality_id'],
-                              'amountCulling': dailyObserve['observed_mortality_animals_selection'],
-                              'amountDeath': dailyObserve['observed_mortality_animals_dead'],
-                              'inputRemark': dailyObserve['observed_mortality_remark'],
-                              'inspectionRound': mortalityInspectionList.length,
-                              'selectedDateTime' : DateTime.parse(dailyObserve['observed_mortality_measurement_date'])
+                            Navigator.pushNamed(context, "/climateneweditscreen", arguments: {
+                              'observationId': dailyObserve['_observed_climate_id'],
+                              'temperature': dailyObserve['observed_climate_temperature'],
+                              'co2': dailyObserve['observed_climate_co2'],
+                              'rh': dailyObserve['observed_climate_rh'],
+                              'inspectionRound': climateInspectionList.length,
+                              'selectedDateTime' : DateTime.parse(dailyObserve['observed_climate_measurement_date'])
                             }).then((reload) => _getFarmSiteInformation());
                           },
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: <Widget>[
                               Text(
-                                "Inspection Round : ${dailyObserve['observed_mortality_observation_nr']}",
+                                "Inspection Round : " + dailyObserve['observed_climate_measurement_nr'].toString(),
                                 style: TextStyle(
                                     color: Colors.black,
                                     fontFamily: "Montserrat",
@@ -316,44 +318,44 @@ class _MortalityHomeScreenState extends State<MortalityHomeScreen> {
                                 margin: EdgeInsets.symmetric(vertical: 10),
                                 color: Colors.grey,
                               ),
-                              Container(
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: <Widget>[
-                                    Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: <Widget>[
-                                        Text(
-                                            "Culling : ${dailyObserve['observed_mortality_animals_selection']}",
-                                            style: TextStyle(
-                                                color: Colors.black,
-                                                fontFamily: "Montserrat",
-                                                fontSize: 14,
-                                                fontWeight: FontWeight.w400
-                                            )
-                                        ),
-                                      ],
-                                    ),
-                                    SizedBox(
-                                      width: MediaQuery.of(context).size.width / 30,
-                                    ),
-                                    Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: <Widget>[
-                                        Text(
-                                            "Death : ${dailyObserve['observed_mortality_animals_dead']}",
-                                            style: TextStyle(
-                                                color: Colors.black,
-                                                fontFamily: "Montserrat",
-                                                fontSize: 14,
-                                                fontWeight: FontWeight.w400
-                                            )
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
+                              Text(
+                                  "Temperature : " + dailyObserve['observed_climate_temperature'].toString() + " " + dailyObserve['observed_climate_temperature_unit'],
+                                  style: TextStyle(
+                                      color: Colors.black,
+                                      fontFamily: "Montserrat",
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w400
+                                  )
                               ),
+                              Container(
+                                height: 0.25,
+                                margin: EdgeInsets.symmetric(vertical: 10),
+                                color: Colors.grey[400],
+                              ),
+                              Text(
+                                  "Relative Humidity : " + dailyObserve['observed_climate_rh'].toString(),
+                                  style: TextStyle(
+                                      color: Colors.black,
+                                      fontFamily: "Montserrat",
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w400
+                                  )
+                              ),
+                              Container(
+                                height: 0.25,
+                                margin: EdgeInsets.symmetric(vertical: 10),
+                                color: Colors.grey[400],
+                              ),
+                              Text(
+                                  "CO2 : " + dailyObserve['observed_climate_co2'].toString() + " " + dailyObserve['observed_climate_temperature_unit'],
+                                  style: TextStyle(
+                                      color: Colors.black,
+                                      fontFamily: "Montserrat",
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w400
+                                  )
+                              ),
+
                             ],
                           ),
                         ),
@@ -369,117 +371,6 @@ class _MortalityHomeScreenState extends State<MortalityHomeScreen> {
     }
   }
 
-  _buildHouseInformationCard(){
-    return Padding(
-      padding: EdgeInsets.fromLTRB(20, 0, 20, 10),
-      child: Card(
-        elevation: 1.5,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(15),
-        ),
-        child: ListTile(
-          contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-          title: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              farmSiteLoaded == true ? Container(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(
-                      "House : " + user['_animal_location_id'].toString(),
-                      style: TextStyle(
-                          color: Colors.black,
-                          fontFamily: "Montserrat",
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600
-                      ),
-                    ),
-                    Container(
-                      height: 0.25,
-                      margin: EdgeInsets.symmetric(vertical: 10),
-                      color: Colors.grey,
-                    ),
-                    Container(
-                      margin: EdgeInsets.only(top: 5),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: <Widget>[
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: <Widget>[
-                              Text(
-//                                  "Round Nr. : 3",
-                                  "Round Nr. : " + management_location['round']['round_nr'].toString(),
-                                  style: TextStyle(
-                                      color: Colors.black,
-                                      fontFamily: "Montserrat",
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w400
-                                  )
-                              ),
-                              SizedBox(
-                                height: 5,
-                              ),
-                              Text(
-//                                  "Dist. Date : 7-10-2019",
-                                  "Dist. Date : " + management_location['management_location_date_start'],
-                                  style: TextStyle(
-                                      color: Colors.black,
-                                      fontFamily: "Montserrat",
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w400
-                                  )
-                              )
-                            ],
-                          ),
-                          SizedBox(
-                            width: MediaQuery.of(context).size.width / 30,
-                          ),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: <Widget>[
-                              Text(
-//                                  "Number : 21821",
-                                  "Number : " + management_location['animal_count'].toString(),
-                                  style: TextStyle(
-                                      color: Colors.black,
-                                      fontFamily: "Montserrat",
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w400
-                                  )
-                              ),
-                              SizedBox(
-                                height: 5,
-                              ),
-                              Text(
-//                                  "Day : 293",
-                                  "Day : " + ((DateTime.now().difference(DateTime.parse(management_location['management_location_date_start']))).inDays + 1).toString(),
-                                  style: TextStyle(
-                                      color: Colors.black,
-                                      fontFamily: "Montserrat",
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w400
-                                  )
-                              )
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ) :
-              SpinKitThreeBounce(
-                  color: Color.fromRGBO(253, 184, 19, 1),
-                  size: 30
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -532,7 +423,7 @@ class _MortalityHomeScreenState extends State<MortalityHomeScreen> {
                           Container(
                             padding: EdgeInsets.fromLTRB(30, 20, 30, 0),
                             child: Text(
-                              "Mortality",
+                              "House Climate",
                               style: TextStyle(
                                   fontFamily: "Montserrat",
                                   fontSize: 20,
@@ -542,8 +433,8 @@ class _MortalityHomeScreenState extends State<MortalityHomeScreen> {
                           ),
                         ],
                       ),
-                      _buildMortalityDateSelector(),
-                      _buildMortalityInspectionCards(),
+                      _buildClimateDateSelector(),
+                      _buildClimateInspectionCards(),
                     ],
                   ),
                 ),
@@ -552,21 +443,17 @@ class _MortalityHomeScreenState extends State<MortalityHomeScreen> {
           ],
         ),
       ),
-      floatingActionButton: mortalityLoaded == true && mortalityInspectionList.length < 2 ? FloatingActionButton(
+      floatingActionButton: FloatingActionButton(
         child: Icon(Icons.add),
         backgroundColor: Color.fromRGBO(253, 184, 19, 1),
         focusColor: Colors.white,
         onPressed: () async {
-          if(mortalityInspectionList.length < 2){
-            Navigator.pushNamed(context, "/dailyobservemortalityneweditscreen", arguments: {
-              'inspectionRound': mortalityInspectionList.length + 1,
-              'selectedDateTime' : selectedDateTime
-            }).then((reload) => _getFarmSiteInformation());
-          } else {
-            await Dialogs.errorRetryDialog(context, "Inspection round has reached the limit", "Close", true);
-          }
+          Navigator.pushNamed(context, "/climateneweditscreen", arguments: {
+            'inspectionRound': climateInspectionList.length + 1,
+            'selectedDateTime' : selectedDateTime
+          }).then((reload) => _getFarmSiteInformation());
         },
-      ) : null,
+      ),
     );
   }
 }
