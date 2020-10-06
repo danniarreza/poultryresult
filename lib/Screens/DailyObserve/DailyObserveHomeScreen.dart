@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
+import 'package:poultryresult/Services/NotificationPlugin.dart';
 import 'package:poultryresult/Services/database_helper.dart';
 import 'package:poultryresult/Services/rest_api.dart';
 import 'package:poultryresult/Widgets/homescreenappbar.dart';
@@ -22,27 +23,26 @@ class _DailyObserveHomeScreenState extends State<DailyObserveHomeScreen> {
   bool management_locationsLoaded = false;
   bool farm_siteLoaded = false;
 
-//  List<Map> dailyObservationsList = [
-//    {
-//      "house_nr": 1,
-//      "round_nr": 3,
-//      "distribution_date": "7-10-2019",
-//      "day_count": 293,
-//      "chicken_count": 21821
-//    },
-//    {
-//      "house_nr": 2,
-//      "round_nr": 3,
-//      "distribution_date": "7-10-2019",
-//      "day_count": 293,
-//      "chicken_count": 24143
-//    }
-//  ];
+  onNotificationInLowerVersions(ReceivedNotification receivedNotification) {
+    print('Notification Received ${receivedNotification.id}');
+  }
+
+  onNotificationClick(String payload) {
+    print('Payload $payload');
+//    Navigator.push(context, MaterialPageRoute(builder: (context) {
+//      return NotificationScreen(
+//        payload: payload,
+//      );
+//    }));
+  }
 
   @override
   void initState() {
     // TODO: implement initState
     super.initState();
+
+    notificationPlugin.setListenerForLowerVersions(onNotificationInLowerVersions);
+    notificationPlugin.setOnNotificationClick(onNotificationClick);
 
     _getFarmSiteLocations();
   }
@@ -102,6 +102,8 @@ class _DailyObserveHomeScreenState extends State<DailyObserveHomeScreen> {
         farm_siteLoaded = true;
         management_locationsLoaded = true;
       });
+
+//      notificationPlugin.showNotification('Welcome to ${farm_sites[0]['farm_sites_name']}!', 'Please select the farm house');
     });
 
   }

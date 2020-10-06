@@ -191,9 +191,6 @@ class _DashboardDetailScreenState extends State<DashboardDetailScreen> {
 
 
   _getManagementLocations() async {
-    setState(() {
-      chartsLoaded = false;
-    });
 
     List<Map<String, dynamic>> users = await DatabaseHelper.instance.get('user');
     List<Map<String, dynamic>> farm_sites = await DatabaseHelper.instance.getWhere('farm_sites', ['_farm_sites_id'], [users[0]['_farm_sites_id']]);
@@ -317,6 +314,7 @@ class _DashboardDetailScreenState extends State<DashboardDetailScreen> {
       waterFeedRatio = water_feed_ratio;
       feedChickenRatio = feed_chicken_ratio;
       farmSiteLoaded = true;
+      chartsLoaded = false;
 
       _populateChart(management_locations[selectedIndex]);
     });

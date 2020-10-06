@@ -3,6 +3,7 @@ import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:poultryresult/Services/database_helper.dart';
 import 'package:poultryresult/Services/rest_api.dart';
 import 'package:poultryresult/Widgets/dialogs.dart';
+import 'package:poultryresult/Services/NotificationPlugin.dart';
 import 'package:sqflite/sqflite.dart';
 
 class CompanyLocationScreen extends StatefulWidget {
@@ -20,10 +21,28 @@ class _CompanyLocationScreenState extends State<CompanyLocationScreen> {
 
   final GlobalKey<FormState> formKey = GlobalKey<FormState>();
 
+  onNotificationInLowerVersions(ReceivedNotification receivedNotification) {
+    print('Notification Received ${receivedNotification.id}');
+  }
+
+  onNotificationClick(String payload) {
+    print('Payload $payload');
+//    Navigator.push(context, MaterialPageRoute(builder: (context) {
+//      return NotificationScreen(
+//        payload: payload,
+//      );
+//    }));
+  }
+
   @override
   void initState() {
     // TODO: implement setState
     super.initState();
+
+//    notificationPlugin.setListenerForLowerVersions(onNotificationInLowerVersions);
+//    notificationPlugin.setOnNotificationClick(onNotificationClick);
+
+    notificationPlugin.showDailyAtTime();
 
     _getUserSession();
     _getFarmSites();
@@ -81,6 +100,8 @@ class _CompanyLocationScreenState extends State<CompanyLocationScreen> {
       companyLocationsJSON = farm_sites;
       companyLocationsLoaded = true;
     });
+
+//    notificationPlugin.showNotification('Welcome to PoultryResult!', 'Please select the farm site');
   }
 
   _getLocations() async {
@@ -490,7 +511,7 @@ class _CompanyLocationScreenState extends State<CompanyLocationScreen> {
 //        print(farmSiteSelected);
       },
       child: Text(
-        warningRaised == true ? "Please Select Company Location" : "Select Company Location",
+        warningRaised == true ? "Please Select Farm Site Location" : "Select Farm Site Location",
         style: warningRaised == true
             ? TextStyle(color: Colors.red, fontFamily: "Montserrat", fontWeight: FontWeight.w500)
             : TextStyle(color: Colors.black, fontFamily: "Montserrat", fontWeight: FontWeight.w500)  ,
@@ -504,7 +525,7 @@ class _CompanyLocationScreenState extends State<CompanyLocationScreen> {
         Column(
           children: <Widget>[
             Text(
-              warningRaised == true ? "Please Select Company Location" : "Select Company Location",
+              warningRaised == true ? "Please Select Farm Site Location" : "Select Farm Site Location",
               style: warningRaised == true
                   ? TextStyle(color: Colors.red, fontFamily: "Montserrat", fontWeight: FontWeight.w500)
                   : TextStyle(color: Colors.black, fontFamily: "Montserrat", fontWeight: FontWeight.w500)  ,
@@ -627,9 +648,9 @@ class _CompanyLocationScreenState extends State<CompanyLocationScreen> {
   _buildLogOutButton(){
     return GestureDetector(
       onTap: () async {
-//        print("Log Out!");
         _deleteUserSession();
         Navigator.pushReplacementNamed(context, "/loginscreen");
+
       },
       child: Container(
         height: 50,

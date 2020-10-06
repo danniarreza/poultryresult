@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:intl/intl.dart';
+import 'package:poultryresult/Services/NotificationPlugin.dart';
 import 'package:poultryresult/Services/database_helper.dart';
 import 'package:poultryresult/Services/globalidentifier_generator.dart';
 import 'package:poultryresult/Services/rest_api.dart';
@@ -36,10 +37,27 @@ class _WeightsNewEditScreenState extends State<WeightsNewEditScreen> {
 
   final GlobalKey<FormState> formKey = GlobalKey<FormState>();
 
+  onNotificationInLowerVersions(ReceivedNotification receivedNotification) {
+    print('Notification Received ${receivedNotification.id}');
+  }
+
+  onNotificationClick(String payload) {
+    print('Payload $payload');
+//    Navigator.push(context, MaterialPageRoute(builder: (context) {
+//      return NotificationScreen(
+//        payload: payload,
+//      );
+//    }));
+  }
+
   @override
   void initState() {
     // TODO: implement setState
     super.initState();
+
+    notificationPlugin.setListenerForLowerVersions(onNotificationInLowerVersions);
+    notificationPlugin.setOnNotificationClick(onNotificationClick);
+
     _getFarmSiteInformation();
 
   }
@@ -361,6 +379,8 @@ class _WeightsNewEditScreenState extends State<WeightsNewEditScreen> {
       dynamic responseJSON = await postData(params, url);
 
       if(responseJSON['status'] == 'Success'){
+        notificationPlugin.scheduleNotification('Hi There!', 'Have you done your daily observation?', DateTime.now().add(Duration(minutes: 1)));
+
         Navigator.pop(context);
         Navigator.pop(context);
       }
