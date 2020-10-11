@@ -284,7 +284,7 @@ class _MortalityHomeScreenState extends State<MortalityHomeScreen> {
                             'amountCulling': dailyObserve['observed_mortality_animals_selection'],
                             'amountDeath': dailyObserve['observed_mortality_animals_dead'],
                             'inputRemark': dailyObserve['observed_mortality_remark'],
-                            'inspectionRound': mortalityInspectionList.length,
+                            'inspectionRound': dailyObserve['observed_mortality_observation_nr'],
                             'selectedDateTime' : DateTime.parse(dailyObserve['observed_mortality_measurement_date'])
                           }).then((reload) => _getFarmSiteInformation());
                         },
@@ -295,7 +295,7 @@ class _MortalityHomeScreenState extends State<MortalityHomeScreen> {
                               'amountCulling': dailyObserve['observed_mortality_animals_selection'],
                               'amountDeath': dailyObserve['observed_mortality_animals_dead'],
                               'inputRemark': dailyObserve['observed_mortality_remark'],
-                              'inspectionRound': mortalityInspectionList.length,
+                              'inspectionRound': dailyObserve['observed_mortality_observation_nr'],
                               'selectedDateTime' : DateTime.parse(dailyObserve['observed_mortality_measurement_date'])
                             }).then((reload) => _getFarmSiteInformation());
                           },
@@ -303,7 +303,7 @@ class _MortalityHomeScreenState extends State<MortalityHomeScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: <Widget>[
                               Text(
-                                "Inspection Round : ${dailyObserve['observed_mortality_observation_nr']}",
+                                "Inspection Round : " + dailyObserve['observed_mortality_observation_nr'].toString(),
                                 style: TextStyle(
                                     color: Colors.black,
                                     fontFamily: "Montserrat",

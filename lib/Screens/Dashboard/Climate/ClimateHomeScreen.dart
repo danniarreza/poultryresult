@@ -286,18 +286,19 @@ class _ClimateHomeScreenState extends State<ClimateHomeScreen> {
                             'temperature': dailyObserve['observed_climate_temperature'],
                             'co2': dailyObserve['observed_climate_co2'],
                             'rh': dailyObserve['observed_climate_rh'],
-                            'inspectionRound': climateInspectionList.length,
+                            'inspectionRound': dailyObserve['observed_climate_measurement_nr'],
                             'selectedDateTime' : DateTime.parse(dailyObserve['observed_climate_measurement_date'])
                           }).then((reload) => _getFarmSiteInformation());
                         },
                         title: GestureDetector(
                           onTap: () async {
+                            print(dailyObserve['observed_climate_measurement_nr']);
                             Navigator.pushNamed(context, "/climateneweditscreen", arguments: {
                               'observationId': dailyObserve['_observed_climate_id'],
                               'temperature': dailyObserve['observed_climate_temperature'],
                               'co2': dailyObserve['observed_climate_co2'],
                               'rh': dailyObserve['observed_climate_rh'],
-                              'inspectionRound': climateInspectionList.length,
+                              'inspectionRound': dailyObserve['observed_climate_measurement_nr'],
                               'selectedDateTime' : DateTime.parse(dailyObserve['observed_climate_measurement_date'])
                             }).then((reload) => _getFarmSiteInformation());
                           },

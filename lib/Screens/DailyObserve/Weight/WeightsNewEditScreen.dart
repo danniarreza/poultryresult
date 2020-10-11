@@ -379,7 +379,7 @@ class _WeightsNewEditScreenState extends State<WeightsNewEditScreen> {
       dynamic responseJSON = await postData(params, url);
 
       if(responseJSON['status'] == 'Success'){
-        notificationPlugin.scheduleNotification('Hi There!', 'Have you done your daily observation?', DateTime.now().add(Duration(minutes: 1)));
+        notificationPlugin.scheduleNotification('Hi There!', 'Have you done weighing the chickens??', DateTime.now().add(Duration(minutes: 1)));
 
         Navigator.pop(context);
         Navigator.pop(context);

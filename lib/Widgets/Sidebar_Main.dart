@@ -32,7 +32,7 @@ class _SidebarMenuState extends State<SidebarMenu> {
             accountName: Text("Danniar Reza"),
             accountEmail: Text("danniarreza@gmail.com"),
             currentAccountPicture: CircleAvatar(
-              backgroundImage: NetworkImage("https://media-exp1.licdn.com/dms/image/C5603AQF6qHF3Z8rkCw/profile-displayphoto-shrink_200_200/0?e=1601510400&v=beta&t=FzaHLTLByYuLnQu3kU5GPOiOB4TiaykrqmJOiAmylqM"),
+              backgroundImage: NetworkImage("https://png.pngtree.com/png-clipart/20190520/original/pngtree-vector-users-icon-png-image_4144740.jpg"),
             ),
           ),
           Container(
