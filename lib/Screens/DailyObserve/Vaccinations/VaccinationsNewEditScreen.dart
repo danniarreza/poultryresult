@@ -1,3 +1,6 @@
+import 'dart:convert';
+
+import 'package:connectivity/connectivity.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:intl/intl.dart';
@@ -493,16 +496,9 @@ class _VaccinationsNewEditScreenState extends State<VaccinationsNewEditScreen> {
     String unit_of_measurement = selectedInputType['input_types_uom'];
     String user_name =  user['user_name'];
 
-//    print(isNew);
-
     if(isNew == true){
-//      List<Map<String, dynamic>> observed_input_uses = await DatabaseHelper.instance.get('observed_input_uses');
-//      int new_observed_input_uses_id = observed_input_uses[observed_input_uses.length - 1]['_observed_input_uses_id'] + 1;
 
       String new_observed_input_uses_id = generate_GlobalIdentifier();
-
-//      print(selectedInputType);
-//      print(vaccinationAmount);
 
       int inserted_observed_input_uses_id = await DatabaseHelper.instance.insert('observed_input_uses', {
         DatabaseHelper.observed_input_uses_id: new_observed_input_uses_id,
@@ -517,8 +513,6 @@ class _VaccinationsNewEditScreenState extends State<VaccinationsNewEditScreen> {
         DatabaseHelper.observed_input_uses_observed_by : user_name,
       });
 
-//      List<Map<String, dynamic>> observed_input_types = await DatabaseHelper.instance.get('observed_input_types');
-//      int new_observed_input_types_id = observed_input_types[observed_input_types.length - 1]['_observed_input_types_id'] + 1;
       String new_observed_input_types_id = generate_GlobalIdentifier();
 
       await DatabaseHelper.instance.insert('observed_input_types', {
@@ -529,6 +523,8 @@ class _VaccinationsNewEditScreenState extends State<VaccinationsNewEditScreen> {
         DatabaseHelper.observed_input_types_creation_date : creation_date,
         DatabaseHelper.observed_input_types_mutation_date : creation_date
       });
+
+      // -----------------------------------------------------------------------
 
       String url = "observedinputuses/insert";
 
@@ -542,36 +538,71 @@ class _VaccinationsNewEditScreenState extends State<VaccinationsNewEditScreen> {
         "user_name": user_name
       };
 
-      dynamic responseJSON = await postData(params, url);
+      var result = await Connectivity().checkConnectivity();
 
-      if(responseJSON['status'] == 'Success'){
+      if(result != ConnectivityResult.none){
 
-        String url = "observedinputtypes/insert";
+        dynamic responseJSON = await postData(params, url);
 
-        Map<String, dynamic> params = {
+        if(responseJSON['status'] == 'Success'){
+
+          String url = "observedinputtypes/insert";
+
+          Map<String, dynamic> params = {
+            "observed_input_type_id": new_observed_input_types_id,
+            "amount": vaccination_amount,
+            "observed_input_uses_id" : new_observed_input_uses_id,
+            "input_type_id" : input_types_id,
+          };
+
+          dynamic responseJSON = await postData(params, url);
+
+          if(responseJSON['status'] == 'Success'){
+            Navigator.pop(context);
+            Navigator.pop(context);
+          }
+
+        }
+
+      } else if(result == ConnectivityResult.none) {
+
+        String synchronization_id = generate_GlobalIdentifier();
+
+        int id = await DatabaseHelper.instance.insert('synchronization_queue', {
+          DatabaseHelper.synchronization_queue_id: synchronization_id,
+          DatabaseHelper.synchronization_queue_url: url,
+          DatabaseHelper.synchronization_queue_params : json.encode(params),
+          DatabaseHelper.synchronization_queue_creation_date : creation_date
+        });
+
+        synchronization_id = generate_GlobalIdentifier();
+
+        url = "observedinputtypes/insert";
+
+        params = {
           "observed_input_type_id": new_observed_input_types_id,
           "amount": vaccination_amount,
           "observed_input_uses_id" : new_observed_input_uses_id,
           "input_type_id" : input_types_id,
         };
 
-        dynamic responseJSON = await postData(params, url);
+        id = await DatabaseHelper.instance.insert('synchronization_queue', {
+          DatabaseHelper.synchronization_queue_id: synchronization_id,
+          DatabaseHelper.synchronization_queue_url: url,
+          DatabaseHelper.synchronization_queue_params : json.encode(params),
+          DatabaseHelper.synchronization_queue_creation_date : creation_date
+        });
 
-        if(responseJSON['status'] == 'Success'){
-          Navigator.pop(context);
-          Navigator.pop(context);
-        }
-
+        Navigator.pop(context);
+        Navigator.pop(context);
       }
+
+      // -----------------------------------------------------------------------
+
 
     } else if(isNew == false){
       String new_observed_input_uses_id = observedInputUsesId;
       String new_observed_input_types_id = observedInputTypesId;
-
-//      print(new_observed_input_uses_id);
-//      print(new_observed_input_types_id);
-//      print(vaccinationAmount);
-//      print(input_types_id);
 
       await DatabaseHelper.instance.update('observed_input_uses', {
         DatabaseHelper.observed_input_uses_id: new_observed_input_uses_id,
@@ -593,6 +624,8 @@ class _VaccinationsNewEditScreenState extends State<VaccinationsNewEditScreen> {
         DatabaseHelper.observed_input_types_mutation_date : creation_date
       });
 
+      // -----------------------------------------------------------------------
+
       String url = "observedinputuses/update";
 
       Map<String, dynamic> params = {
@@ -605,28 +638,68 @@ class _VaccinationsNewEditScreenState extends State<VaccinationsNewEditScreen> {
         "user_name": user_name
       };
 
-      dynamic responseJSON = await postData(params, url);
+      var result = await Connectivity().checkConnectivity();
 
-      if(responseJSON['status'] == 'Success'){
+      if(result != ConnectivityResult.none){
+
+        dynamic responseJSON = await postData(params, url);
+
+        if(responseJSON['status'] == 'Success'){
+
+          url = "observedinputtypes/update";
+
+
+          Map<String, dynamic> params = {
+            "observed_input_type_id": new_observed_input_types_id,
+            "amount": vaccination_amount,
+            "observed_input_uses_id" : new_observed_input_uses_id,
+            "input_type_id" : input_types_id,
+          };
+
+          dynamic responseJSON = await postData(params, url);
+
+          if(responseJSON['status'] == 'Success'){
+            Navigator.pop(context);
+            Navigator.pop(context);
+          }
+
+        }
+
+      } else if(result == ConnectivityResult.none){
+
+        String synchronization_id = generate_GlobalIdentifier();
+
+        int id = await DatabaseHelper.instance.insert('synchronization_queue', {
+          DatabaseHelper.synchronization_queue_id: synchronization_id,
+          DatabaseHelper.synchronization_queue_url: url,
+          DatabaseHelper.synchronization_queue_params : json.encode(params),
+          DatabaseHelper.synchronization_queue_creation_date : creation_date
+        });
+
+        synchronization_id = generate_GlobalIdentifier();
 
         url = "observedinputtypes/update";
 
-
-        Map<String, dynamic> params = {
+        params = {
           "observed_input_type_id": new_observed_input_types_id,
           "amount": vaccination_amount,
           "observed_input_uses_id" : new_observed_input_uses_id,
           "input_type_id" : input_types_id,
         };
 
-        dynamic responseJSON = await postData(params, url);
+        id = await DatabaseHelper.instance.insert('synchronization_queue', {
+          DatabaseHelper.synchronization_queue_id: synchronization_id,
+          DatabaseHelper.synchronization_queue_url: url,
+          DatabaseHelper.synchronization_queue_params : json.encode(params),
+          DatabaseHelper.synchronization_queue_creation_date : creation_date
+        });
 
-        if(responseJSON['status'] == 'Success'){
-          Navigator.pop(context);
-          Navigator.pop(context);
-        }
+        Navigator.pop(context);
+        Navigator.pop(context);
 
       }
+
+    // -----------------------------------------------------------------------
 
     }
 

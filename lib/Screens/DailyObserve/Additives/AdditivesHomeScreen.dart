@@ -1,7 +1,11 @@
+import 'dart:convert';
+
+import 'package:connectivity/connectivity.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:intl/intl.dart';
 import 'package:poultryresult/Services/database_helper.dart';
+import 'package:poultryresult/Services/globalidentifier_generator.dart';
 import 'package:poultryresult/Services/rest_api.dart';
 import 'package:poultryresult/Widgets/dialogs.dart';
 import 'package:poultryresult/Widgets/homescreenappbar.dart';
@@ -406,7 +410,7 @@ class _AdditivesHomeScreenState extends State<AdditivesHomeScreen> {
                 return Dismissible(
                   key: Key(dailyObserve['_observed_input_uses_id']),
                   onDismissed: (direction) async {
-
+                    String creation_date = DateFormat("yyyy-MM-dd HH:mm:ss").format(DateTime.now());
                     String url = "observedinputuses/delete";
 
                     Map<String, dynamic> params = {
@@ -414,14 +418,31 @@ class _AdditivesHomeScreenState extends State<AdditivesHomeScreen> {
                       "user_name" : user['user_name']
                     };
 
-                    dynamic responseJSON = await postData(params, url);
-
                     dailyObserve['observed_input_types'].forEach((element) async {
                       await DatabaseHelper.instance.deleteWhere('observed_input_types', ['_observed_input_types_id'], [element['_observed_input_types_id']]);
                     });
 
                     int deletedCount = await DatabaseHelper.instance.deleteWhere('observed_input_uses', ['_observed_input_uses_id'], [dailyObserve['_observed_input_uses_id']]);
                     print(deletedCount);
+
+                    var result = await Connectivity().checkConnectivity();
+
+                    if(result != ConnectivityResult.none){
+
+                      dynamic responseJSON = await postData(params, url);
+
+                    } else if (result == ConnectivityResult.none) {
+
+                      String synchronization_id = generate_GlobalIdentifier();
+
+                      int id = await DatabaseHelper.instance.insert('synchronization_queue', {
+                        DatabaseHelper.synchronization_queue_id: synchronization_id,
+                        DatabaseHelper.synchronization_queue_url: url,
+                        DatabaseHelper.synchronization_queue_params : json.encode(params),
+                        DatabaseHelper.synchronization_queue_creation_date : creation_date
+                      });
+
+                    }
 
                     setState(() {
                       inputUsesInspectionList.removeAt(index);

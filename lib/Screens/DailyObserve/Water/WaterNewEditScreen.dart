@@ -1,3 +1,6 @@
+import 'dart:convert';
+
+import 'package:connectivity/connectivity.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:intl/intl.dart';
@@ -330,9 +333,6 @@ class _WaterNewEditScreenState extends State<WaterNewEditScreen> {
     String user_name =  user['user_name'];
 
     if(isNew == true){
-//      List<Map<String, dynamic>> water_uses = await DatabaseHelper.instance.get('observed_water_uses');
-//      int water_id = water_uses.length > 0 ? water_uses[water_uses.length - 1]['_observed_water_uses_id'] + 1 : 1;
-
       String water_id = generate_GlobalIdentifier();
 
       int id = await DatabaseHelper.instance.insert('observed_water_uses', {
@@ -345,6 +345,8 @@ class _WaterNewEditScreenState extends State<WaterNewEditScreen> {
         DatabaseHelper.observed_water_uses_observed_by : user_name
       });
 
+      // -----------------------------------------------------------------------
+
       String url = "water/insert";
 
       Map<String, dynamic> params = {
@@ -356,13 +358,32 @@ class _WaterNewEditScreenState extends State<WaterNewEditScreen> {
         "user_name": user_name
       };
 
-      dynamic responseJSON = await postData(params, url);
+      var result = await Connectivity().checkConnectivity();
 
-      if(responseJSON['status'] == 'Success'){
+      if(result != ConnectivityResult.none){
+
+        dynamic responseJSON = await postData(params, url);
+
+        if(responseJSON['status'] == 'Success'){
+          Navigator.pop(context);
+          Navigator.pop(context);
+        }
+
+      } else if (result == ConnectivityResult.none) {
+        String synchronization_id = generate_GlobalIdentifier();
+
+        int id = await DatabaseHelper.instance.insert('synchronization_queue', {
+          DatabaseHelper.synchronization_queue_id: synchronization_id,
+          DatabaseHelper.synchronization_queue_url: url,
+          DatabaseHelper.synchronization_queue_params : json.encode(params),
+          DatabaseHelper.synchronization_queue_creation_date : creation_date
+        });
+
         Navigator.pop(context);
         Navigator.pop(context);
       }
 
+      // -----------------------------------------------------------------------
 
     } else if(isNew == false){
       String water_id = observationId;
@@ -375,6 +396,8 @@ class _WaterNewEditScreenState extends State<WaterNewEditScreen> {
         DatabaseHelper.observed_water_uses_observed_by : user_name
       });
 
+      // -----------------------------------------------------------------------
+
       String url = "water/update";
 
       Map<String, dynamic> params = {
@@ -386,12 +409,32 @@ class _WaterNewEditScreenState extends State<WaterNewEditScreen> {
         "user_name": user_name
       };
 
-      dynamic responseJSON = await postData(params, url);
+      var result = await Connectivity().checkConnectivity();
 
-      if(responseJSON['status'] == 'Success'){
+      if(result != ConnectivityResult.none){
+
+        dynamic responseJSON = await postData(params, url);
+
+        if(responseJSON['status'] == 'Success'){
+          Navigator.pop(context);
+          Navigator.pop(context);
+        }
+
+      } else if (result == ConnectivityResult.none) {
+        String synchronization_id = generate_GlobalIdentifier();
+
+        int id = await DatabaseHelper.instance.insert('synchronization_queue', {
+          DatabaseHelper.synchronization_queue_id: synchronization_id,
+          DatabaseHelper.synchronization_queue_url: url,
+          DatabaseHelper.synchronization_queue_params : json.encode(params),
+          DatabaseHelper.synchronization_queue_creation_date : creation_date
+        });
+
         Navigator.pop(context);
         Navigator.pop(context);
       }
+
+      // -----------------------------------------------------------------------
 
     }
 

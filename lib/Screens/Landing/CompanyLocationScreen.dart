@@ -15,6 +15,7 @@ class _CompanyLocationScreenState extends State<CompanyLocationScreen> {
 
   String farmSiteSelected;
   String user_name;
+  String user_fullname;
   bool warningRaised = false;
   List<Map> companyLocationsJSON = [];
   bool companyLocationsLoaded = false;
@@ -54,6 +55,7 @@ class _CompanyLocationScreenState extends State<CompanyLocationScreen> {
 //    print(rows);
     setState(() {
       user_name = rows[0]['user_name'];
+      user_fullname = rows[0]['user_fullname'];
     });
   }
 
@@ -103,6 +105,7 @@ class _CompanyLocationScreenState extends State<CompanyLocationScreen> {
 
 //    notificationPlugin.showNotification('Welcome to PoultryResult!', 'Please select the farm site');
   }
+
 
   _getLocations() async {
     List<Map<String, dynamic>> locations = await DatabaseHelper.instance.get('animal_location');
@@ -494,7 +497,7 @@ class _CompanyLocationScreenState extends State<CompanyLocationScreen> {
 
   _buildWelcomeText(){
     return Text(
-      "Welcome, $user_name",
+      "Welcome, \n $user_fullname",
       textAlign: TextAlign.center,
       style: TextStyle(
         color: Colors.black,

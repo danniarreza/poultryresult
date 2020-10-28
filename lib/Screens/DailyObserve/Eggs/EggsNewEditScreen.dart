@@ -1,3 +1,6 @@
+import 'dart:convert';
+
+import 'package:connectivity/connectivity.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:intl/intl.dart';
@@ -554,7 +557,7 @@ class _EggsNewEditScreenState extends State<EggsNewEditScreen> {
         DatabaseHelper.observed_egg_production_observed_by : user_name,
       });
 
-//      print(id);
+      // -----------------------------------------------------------------------
 
       String url = "eggproduction/insert";
 
@@ -569,13 +572,34 @@ class _EggsNewEditScreenState extends State<EggsNewEditScreen> {
         "user_name": user_name
       };
 
-      dynamic responseJSON = await postData(params, url);
+      var result = await Connectivity().checkConnectivity();
 
-      if(responseJSON['status'] == 'Success'){
+      if(result != ConnectivityResult.none){
+
+        dynamic responseJSON = await postData(params, url);
+
+        if(responseJSON['status'] == 'Success'){
+          Navigator.pop(context);
+          Navigator.pop(context);
+        }
+
+      } else if (result == ConnectivityResult.none) {
+
+        String synchronization_id = generate_GlobalIdentifier();
+
+        int id = await DatabaseHelper.instance.insert('synchronization_queue', {
+          DatabaseHelper.synchronization_queue_id: synchronization_id,
+          DatabaseHelper.synchronization_queue_url: url,
+          DatabaseHelper.synchronization_queue_params : json.encode(params),
+          DatabaseHelper.synchronization_queue_creation_date : creation_date
+        });
+
         Navigator.pop(context);
         Navigator.pop(context);
+
       }
 
+      // -----------------------------------------------------------------------
 
     } else if(isNew == false){
       String new_observed_egg_production_id = observationId;
@@ -592,6 +616,8 @@ class _EggsNewEditScreenState extends State<EggsNewEditScreen> {
         DatabaseHelper.observed_egg_production_observed_by : user_name,
       });
 
+      // -----------------------------------------------------------------------
+
       String url = "eggproduction/update";
 
       Map<String, dynamic> params = {
@@ -605,16 +631,36 @@ class _EggsNewEditScreenState extends State<EggsNewEditScreen> {
         "user_name": user_name
       };
 
-      dynamic responseJSON = await postData(params, url);
+      var result = await Connectivity().checkConnectivity();
 
-      if(responseJSON['status'] == 'Success'){
+      if(result != ConnectivityResult.none){
+
+        dynamic responseJSON = await postData(params, url);
+
+        if(responseJSON['status'] == 'Success'){
+          Navigator.pop(context);
+          Navigator.pop(context);
+        }
+
+      } else if (result == ConnectivityResult.none) {
+
+        String synchronization_id = generate_GlobalIdentifier();
+
+        int id = await DatabaseHelper.instance.insert('synchronization_queue', {
+          DatabaseHelper.synchronization_queue_id: synchronization_id,
+          DatabaseHelper.synchronization_queue_url: url,
+          DatabaseHelper.synchronization_queue_params : json.encode(params),
+          DatabaseHelper.synchronization_queue_creation_date : creation_date
+        });
+
         Navigator.pop(context);
         Navigator.pop(context);
+
       }
 
+      // -----------------------------------------------------------------------
+
     }
-
-
 
   }
 

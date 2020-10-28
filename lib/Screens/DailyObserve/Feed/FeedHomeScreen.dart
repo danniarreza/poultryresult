@@ -1,3 +1,6 @@
+import 'dart:convert';
+
+import 'package:connectivity/connectivity.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:intl/intl.dart';
@@ -439,6 +442,7 @@ class _FeedHomeScreenState extends State<FeedHomeScreen> {
                   key: Key(dailyObserve['_observed_input_uses_id']),
                   onDismissed: (direction) async {
 
+                    String creation_date = DateFormat("yyyy-MM-dd HH:mm:ss").format(DateTime.now());
                     String url = "observedinputuses/delete";
 
                     Map<String, dynamic> params = {
@@ -446,14 +450,31 @@ class _FeedHomeScreenState extends State<FeedHomeScreen> {
                       "user_name" : user['user_name']
                     };
 
-                    dynamic responseJSON = await postData(params, url);
-
                     dailyObserve['observed_input_types'].forEach((element) async {
                       await DatabaseHelper.instance.deleteWhere('observed_input_types', ['_observed_input_types_id'], [element['_observed_input_types_id']]);
                     });
 
                     int deletedCount = await DatabaseHelper.instance.deleteWhere('observed_input_uses', ['_observed_input_uses_id'], [dailyObserve['_observed_input_uses_id']]);
                     print(deletedCount);
+
+                    var result = await Connectivity().checkConnectivity();
+
+                    if(result != ConnectivityResult.none){
+
+                      dynamic responseJSON = await postData(params, url);
+
+                    } else if (result == ConnectivityResult.none) {
+
+                      String synchronization_id = generate_GlobalIdentifier();
+
+                      int id = await DatabaseHelper.instance.insert('synchronization_queue', {
+                        DatabaseHelper.synchronization_queue_id: synchronization_id,
+                        DatabaseHelper.synchronization_queue_url: url,
+                        DatabaseHelper.synchronization_queue_params : json.encode(params),
+                        DatabaseHelper.synchronization_queue_creation_date : creation_date
+                      });
+
+                    }
 
                     setState(() {
                       inputUsesInspectionList.removeAt(index);
@@ -609,15 +630,6 @@ class _FeedHomeScreenState extends State<FeedHomeScreen> {
         ]
     );
 
-//    List<Map<String, dynamic>> observed_input_uses = await DatabaseHelper.instance.get('observed_input_uses');
-//    int new_observed_input_uses_id = observed_input_uses[observed_input_uses.length - 1]['_observed_input_uses_id'];
-
-//    List<Map<String, dynamic>> observed_input_types = await DatabaseHelper.instance.get('observed_input_types');
-//    int new_observed_input_types_id = observed_input_types[observed_input_types.length - 1]['_observed_input_types_id'];
-
-
-//    print(observedInputUsesFromDB);
-
     observedInputUsesFromDB.forEach((oiu) async {
       Map<String, dynamic> observedInputUse = Map<String, dynamic>();
       List<Map<String, dynamic>> observedInputTypes = List<Map<String, dynamic>>();
@@ -626,7 +638,8 @@ class _FeedHomeScreenState extends State<FeedHomeScreen> {
           'observed_input_types', ['observed_input_types_oue_id'], [oiu['_observed_input_uses_id']]
       );
 
-      observedInputTypesFromDB.forEach((oit) async {
+      Future.forEach(observedInputTypesFromDB, (oit) async {
+
         Map<String, dynamic> observedInputType = Map<String, dynamic>();
         Map<String, dynamic> inputType = Map<String, dynamic>();
         List<Map<String, dynamic>> inputTypesFromDB = await DatabaseHelper.instance.getById('input_types', oit['observed_input_types_ite_id']);
@@ -657,17 +670,6 @@ class _FeedHomeScreenState extends State<FeedHomeScreen> {
         String unit_of_measurement = inputType['input_types_uom'];
         String user_name =  user['user_name'];
 
-//        observedInputUses.add(observedInputUse);
-
-//        print("management_location_id "+ management_location_id.toString());
-//        print("measurement_date "+ measurement_date);
-//        print("creation_date "+creation_date);
-//        print("treatment_nr "+ treatment_nr.toString());
-//        print("feed_amount "+ feed_amount.toString());
-//        print("oue_type "+ oue_type);
-//        print("input_types_id "+ input_types_id.toString());
-//        print("unit_of_measurement "+unit_of_measurement);
-//        print("user_name "+ user_name);
 //        print("----------------------------------------------------------------------");
 
         String new_observed_input_uses_id = generate_GlobalIdentifier();
@@ -695,6 +697,8 @@ class _FeedHomeScreenState extends State<FeedHomeScreen> {
           DatabaseHelper.observed_input_types_mutation_date : creation_date
         });
 
+        // -----------------------------------------------------------------------
+
         String url = "observedinputuses/insert";
 
         Map<String, dynamic> params = {
@@ -707,27 +711,64 @@ class _FeedHomeScreenState extends State<FeedHomeScreen> {
           "user_name": user_name
         };
 
-        dynamic responseJSON = await postData(params, url);
+        var result = await Connectivity().checkConnectivity();
 
-        if(responseJSON['status'] == 'Success') {
-          String url = "observedinputtypes/insert";
-
-          Map<String, dynamic> params = {
-            "observed_input_type_id": new_observed_input_types_id,
-            "amount": feed_amount,
-            "observed_input_uses_id": new_observed_input_uses_id,
-            "input_type_id": input_types_id,
-          };
+        if(result != ConnectivityResult.none){
 
           dynamic responseJSON = await postData(params, url);
-        };
 
+          if(responseJSON['status'] == 'Success') {
+            String url = "observedinputtypes/insert";
 
+            Map<String, dynamic> params = {
+              "observed_input_type_id": new_observed_input_types_id,
+              "amount": feed_amount,
+              "observed_input_uses_id": new_observed_input_uses_id,
+              "input_type_id": input_types_id,
+            };
+
+            dynamic responseJSON = await postData(params, url);
+          };
+
+        } else if (result == ConnectivityResult.none) {
+
+          String synchronization_id = generate_GlobalIdentifier();
+
+          int id = await DatabaseHelper.instance.insert('synchronization_queue', {
+            DatabaseHelper.synchronization_queue_id: synchronization_id,
+            DatabaseHelper.synchronization_queue_url: url,
+            DatabaseHelper.synchronization_queue_params : json.encode(params),
+            DatabaseHelper.synchronization_queue_creation_date : creation_date
+          });
+
+          synchronization_id = generate_GlobalIdentifier();
+
+          url = "observedinputtypes/insert";
+
+          params = {
+            "observed_input_type_id": new_observed_input_types_id,
+            "amount": feed_amount,
+            "observed_input_uses_id" : new_observed_input_uses_id,
+            "input_type_id" : input_types_id,
+          };
+
+          id = await DatabaseHelper.instance.insert('synchronization_queue', {
+            DatabaseHelper.synchronization_queue_id: synchronization_id,
+            DatabaseHelper.synchronization_queue_url: url,
+            DatabaseHelper.synchronization_queue_params : json.encode(params),
+            DatabaseHelper.synchronization_queue_creation_date : creation_date
+          });
+
+        }
       });
+
+//      observedInputTypesFromDB.forEach((oit) async {
+//
+//      });
 
     });
 
-    Future.delayed(Duration(seconds: 2), (){
+    Future.delayed(Duration(seconds: 1), (){
       Navigator.pop(context);
       _getFeedSelectedDate();
     });

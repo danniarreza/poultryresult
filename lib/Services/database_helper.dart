@@ -12,6 +12,7 @@ class DatabaseHelper{
   static final _userTable = 'user';
   static final user_id = '_user_id';
   static final user_name = 'user_name';
+  static final user_fullname = 'user_fullname';
   static final user_password = 'user_password';
   static final user_farm_sites_id = '_farm_sites_id';
   static final user_location_id = '_animal_location_id';
@@ -149,6 +150,12 @@ class DatabaseHelper{
   static final observed_climate_mutation_date = 'observed_climate_mutation_date';
   static final observed_climate_observed_by = 'observed_climate_observed_by';
 
+  static final _synchronization_queue_table = 'synchronization_queue';
+  static final synchronization_queue_id = '_synchronization_queue_id';
+  static final synchronization_queue_url = 'synchronization_queue_url';
+  static final synchronization_queue_params = 'synchronization_queue_params';
+  static final synchronization_queue_creation_date = 'synchronization_queue_creation_date';
+
   DatabaseHelper._privateConstructor();
   static final DatabaseHelper instance = DatabaseHelper._privateConstructor();
 
@@ -179,6 +186,7 @@ class DatabaseHelper{
       CREATE TABLE $_userTable(
       $user_id INTEGER PRIMARY KEY,
       $user_name TEXT NOT NULL,
+      $user_fullname TEXT NOT NULL,
       $user_password TEXT NOT NULL,
       $user_location_id INTEGER,
       $user_farm_sites_id INTEGER,
@@ -375,6 +383,17 @@ class DatabaseHelper{
       $observed_climate_mutation_date TEXT,
       $observed_climate_observed_by TEXT
       );
+      '''
+    );
+
+    db.execute(
+      '''
+      CREATE TABLE $_synchronization_queue_table(
+      $synchronization_queue_id TEXT PRIMARY KEY,
+      $synchronization_queue_url TEXT NOT NULL,
+      $synchronization_queue_params TEXT,
+      $synchronization_queue_creation_date TEXT
+      )
       '''
     );
   }

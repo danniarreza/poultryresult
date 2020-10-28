@@ -222,15 +222,15 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if(responseJSON['status'] == "Success"){
 
-        print(responseJSON['message']);
+        print(responseJSON);
 
         String tableName = 'user';
         int id = await DatabaseHelper.instance.insert(tableName, {
           DatabaseHelper.user_name : username,
           DatabaseHelper.user_password : password,
+          DatabaseHelper.user_fullname : responseJSON['user']['user_fullname']
         });
 
-        print('The inserted ID : $id');
         Navigator.pop(context);
         Navigator.pushReplacementNamed(context, '/companylocation');
       } else {

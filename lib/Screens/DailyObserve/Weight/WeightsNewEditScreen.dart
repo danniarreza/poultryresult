@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'package:connectivity/connectivity.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:intl/intl.dart';
@@ -340,7 +342,6 @@ class _WeightsNewEditScreenState extends State<WeightsNewEditScreen> {
     Dialogs.waitingDialog(context, "Submitting...", "Please Wait", false);
 
     String management_location_id = management_location['_management_location_id'];
-    String uu_id = "fiwnefwnf";
     String measurement_date = DateFormat('yyyy-MM-dd').format(selectedDateTime);
     String creation_date = DateFormat("yyyy-MM-dd HH:mm:ss").format(DateTime.now());
     int weight_amount = amountWeight;
@@ -348,9 +349,6 @@ class _WeightsNewEditScreenState extends State<WeightsNewEditScreen> {
     String user_name =  user['user_name'];
 
     if(isNew == true){
-//      List<Map<String, dynamic>> weights = await DatabaseHelper.instance.get('observed_weight');
-//      int weight_id = weights.length > 0 ? weights[weights.length - 1]['_observed_weight_id'] + 1 : 1;
-
       String weight_id = generate_GlobalIdentifier();
       print(weight_id);
 
@@ -364,6 +362,8 @@ class _WeightsNewEditScreenState extends State<WeightsNewEditScreen> {
         DatabaseHelper.observed_weight_observed_by : user_name
       });
 
+      // -----------------------------------------------------------------------
+
       String url = "weight/insert";
 
       Map<String, dynamic> params = {
@@ -376,14 +376,36 @@ class _WeightsNewEditScreenState extends State<WeightsNewEditScreen> {
         "user_name": user_name
       };
 
-      dynamic responseJSON = await postData(params, url);
+      var result = await Connectivity().checkConnectivity();
 
-      if(responseJSON['status'] == 'Success'){
-        notificationPlugin.scheduleNotification('Hi There!', 'Have you done weighing the chickens??', DateTime.now().add(Duration(minutes: 1)));
+      if(result != ConnectivityResult.none){
+
+        dynamic responseJSON = await postData(params, url);
+
+        if(responseJSON['status'] == 'Success'){
+          notificationPlugin.scheduleNotification('Hi There!', 'Have you done weighing the chickens??', DateTime.now().add(Duration(minutes: 1)));
+
+          Navigator.pop(context);
+          Navigator.pop(context);
+        }
+
+      } else if (result == ConnectivityResult.none) {
+
+        String synchronization_id = generate_GlobalIdentifier();
+
+        int id = await DatabaseHelper.instance.insert('synchronization_queue', {
+          DatabaseHelper.synchronization_queue_id: synchronization_id,
+          DatabaseHelper.synchronization_queue_url: url,
+          DatabaseHelper.synchronization_queue_params : json.encode(params),
+          DatabaseHelper.synchronization_queue_creation_date : creation_date
+        });
 
         Navigator.pop(context);
         Navigator.pop(context);
+
       }
+
+      // -----------------------------------------------------------------------
 
 
     } else if(isNew == false){
@@ -397,11 +419,12 @@ class _WeightsNewEditScreenState extends State<WeightsNewEditScreen> {
         DatabaseHelper.observed_weight_observed_by : user_name
       });
 
+      // -----------------------------------------------------------------------
+
       String url = "weight/update";
 
       Map<String, dynamic> params = {
         "weight_id": weight_id,
-        "uu_id" : uu_id,
         "measurement_date" : measurement_date,
         "weight": weight_amount,
         "unit": weight_unit,
@@ -409,12 +432,36 @@ class _WeightsNewEditScreenState extends State<WeightsNewEditScreen> {
         "user_name": user_name
       };
 
-      dynamic responseJSON = await postData(params, url);
+      var result = await Connectivity().checkConnectivity();
 
-      if(responseJSON['status'] == 'Success'){
+      if(result != ConnectivityResult.none){
+
+        dynamic responseJSON = await postData(params, url);
+
+        if(responseJSON['status'] == 'Success'){
+          notificationPlugin.scheduleNotification('Hi There!', 'Have you done weighing the chickens??', DateTime.now().add(Duration(minutes: 1)));
+
+          Navigator.pop(context);
+          Navigator.pop(context);
+        }
+
+      } else if (result == ConnectivityResult.none) {
+
+        String synchronization_id = generate_GlobalIdentifier();
+
+        int id = await DatabaseHelper.instance.insert('synchronization_queue', {
+          DatabaseHelper.synchronization_queue_id: synchronization_id,
+          DatabaseHelper.synchronization_queue_url: url,
+          DatabaseHelper.synchronization_queue_params : json.encode(params),
+          DatabaseHelper.synchronization_queue_creation_date : creation_date
+        });
+
         Navigator.pop(context);
         Navigator.pop(context);
+
       }
+
+      // -----------------------------------------------------------------------
 
     }
   }

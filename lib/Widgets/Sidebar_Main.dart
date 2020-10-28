@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:poultryresult/Screens/DailyObserve/DailyObserveHomeScreen.dart';
 import 'package:poultryresult/Screens/Dashboard/DashboardDetailScreen.dart';
 import 'package:poultryresult/Screens/Dashboard/DashboardHomeScreen.dart';
+import 'package:poultryresult/Services/database_helper.dart';
 
 class SidebarMenu extends StatefulWidget {
   @override
@@ -22,6 +23,30 @@ class _SidebarMenuState extends State<SidebarMenu> {
     ExpansionMenuItem(isExpanded: false, header: "Daily Observations", body: ["Mortality","Feed","Water","Weights","Vaccinations","Additives",]),
   ];
 
+
+  bool user_loaded = false;
+  String user_name;
+  String user_fullname;
+
+  @override
+  void initState() {
+    // TODO: implement setState
+    super.initState();
+
+    _getUserSession();
+  }
+
+  _getUserSession() async {
+    String tableName = 'user';
+    List<Map<String, dynamic>> rows = await DatabaseHelper.instance.getById(tableName, 1);
+//    print(rows);
+    setState(() {
+      user_name = rows[0]['user_name'];
+      user_fullname = rows[0]['user_fullname'];
+      user_loaded = true;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Drawer(
@@ -29,8 +54,8 @@ class _SidebarMenuState extends State<SidebarMenu> {
         padding: EdgeInsets.all(0.0),
         children: <Widget>[
           UserAccountsDrawerHeader(
-            accountName: Text("Danniar Reza"),
-            accountEmail: Text("danniarreza@gmail.com"),
+            accountName: user_loaded == true ? Text(user_fullname) : Container(),
+            accountEmail: user_loaded == true ? Text(user_name) : Container(),
             currentAccountPicture: CircleAvatar(
               backgroundImage: NetworkImage("https://png.pngtree.com/png-clipart/20190520/original/pngtree-vector-users-icon-png-image_4144740.jpg"),
             ),

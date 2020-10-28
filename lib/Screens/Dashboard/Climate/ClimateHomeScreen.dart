@@ -1,6 +1,10 @@
+import 'dart:convert';
+
+import 'package:connectivity/connectivity.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:poultryresult/Services/database_helper.dart';
+import 'package:poultryresult/Services/globalidentifier_generator.dart';
 import 'package:poultryresult/Services/rest_api.dart';
 import 'package:poultryresult/Widgets/dialogs.dart';
 import 'package:poultryresult/Widgets/homescreenappbar.dart';
@@ -254,6 +258,7 @@ class _ClimateHomeScreenState extends State<ClimateHomeScreen> {
                   key: Key(dailyObserve['_observed_climate_id']),
                   onDismissed: (direction) async {
 
+                    String creation_date = DateFormat("yyyy-MM-dd HH:mm:ss").format(DateTime.now());
                     String url = "observedclimate/delete";
 
                     Map<String, dynamic> params = {
@@ -261,10 +266,27 @@ class _ClimateHomeScreenState extends State<ClimateHomeScreen> {
                       "user_name" : user['user_name']
                     };
 
-                    dynamic responseJSON = await postData(params, url);
-
                     int deletedCount = await DatabaseHelper.instance.deleteWhere('observed_climate', ['_observed_climate_id'], [dailyObserve['_observed_climate_id']]);
                     print(deletedCount);
+
+                    var result = await Connectivity().checkConnectivity();
+
+                    if(result != ConnectivityResult.none){
+
+                      dynamic responseJSON = await postData(params, url);
+
+                    } else if (result == ConnectivityResult.none) {
+
+                      String synchronization_id = generate_GlobalIdentifier();
+
+                      int id = await DatabaseHelper.instance.insert('synchronization_queue', {
+                        DatabaseHelper.synchronization_queue_id: synchronization_id,
+                        DatabaseHelper.synchronization_queue_url: url,
+                        DatabaseHelper.synchronization_queue_params : json.encode(params),
+                        DatabaseHelper.synchronization_queue_creation_date : creation_date
+                      });
+
+                    }
 
                     setState(() {
                       climateInspectionList.removeAt(index);

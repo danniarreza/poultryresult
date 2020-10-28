@@ -1,3 +1,6 @@
+import 'dart:convert';
+
+import 'package:connectivity/connectivity.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:intl/intl.dart';
@@ -408,6 +411,7 @@ class _WaterHomeScreenState extends State<WaterHomeScreen> {
                   key: Key(dailyObserve['_observed_water_uses_id']),
                   onDismissed: (direction) async {
 
+                    String creation_date = DateFormat("yyyy-MM-dd HH:mm:ss").format(DateTime.now());
                     String url = "water/delete";
 
                     Map<String, dynamic> params = {
@@ -415,10 +419,27 @@ class _WaterHomeScreenState extends State<WaterHomeScreen> {
                       "user_name" : user['user_name']
                     };
 
-                    dynamic responseJSON = await postData(params, url);
-
                     int deletedCount = await DatabaseHelper.instance.deleteWhere('observed_water_uses', ['_observed_water_uses_id'], [dailyObserve['_observed_water_uses_id']]);
                     print(deletedCount);
+
+                    var result = await Connectivity().checkConnectivity();
+
+                    if(result != ConnectivityResult.none){
+
+                      dynamic responseJSON = await postData(params, url);
+
+                    } else if (result == ConnectivityResult.none) {
+
+                      String synchronization_id = generate_GlobalIdentifier();
+
+                      int id = await DatabaseHelper.instance.insert('synchronization_queue', {
+                        DatabaseHelper.synchronization_queue_id: synchronization_id,
+                        DatabaseHelper.synchronization_queue_url: url,
+                        DatabaseHelper.synchronization_queue_params : json.encode(params),
+                        DatabaseHelper.synchronization_queue_creation_date : creation_date
+                      });
+
+                    }
 
                     setState(() {
                       waterInspectionList.removeAt(index);
@@ -518,6 +539,8 @@ class _WaterHomeScreenState extends State<WaterHomeScreen> {
           DatabaseHelper.observed_water_uses_observed_by : user_name
         });
 
+        // -----------------------------------------------------------------------
+
         String url = "water/insert";
 
         Map<String, dynamic> params = {
@@ -529,12 +552,35 @@ class _WaterHomeScreenState extends State<WaterHomeScreen> {
           "user_name": user_name
         };
 
-        dynamic responseJSON = await postData(params, url);
+        var result = await Connectivity().checkConnectivity();
 
-        if(responseJSON['status'] == 'Success'){
+        if(result != ConnectivityResult.none){
+
+          dynamic responseJSON = await postData(params, url);
+
+          if(responseJSON['status'] == 'Success'){
+            Navigator.pop(context);
+          }
+          _getWaterUsesSelectedDate();
+
+        } else if (result == ConnectivityResult.none) {
+
+          String synchronization_id = generate_GlobalIdentifier();
+
+          int id = await DatabaseHelper.instance.insert('synchronization_queue', {
+            DatabaseHelper.synchronization_queue_id: synchronization_id,
+            DatabaseHelper.synchronization_queue_url: url,
+            DatabaseHelper.synchronization_queue_params : json.encode(params),
+            DatabaseHelper.synchronization_queue_creation_date : creation_date
+          });
+
           Navigator.pop(context);
+          _getWaterUsesSelectedDate();
+
         }
-        _getWaterUsesSelectedDate();
+
+        // -----------------------------------------------------------------------
+
       } else {
         Navigator.pop(context);
         await Dialogs.errorRetryDialog(context, "No previous observation has been found", "Close", true);

@@ -1,3 +1,6 @@
+import 'dart:convert';
+
+import 'package:connectivity/connectivity.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:poultryresult/Services/database_helper.dart';
@@ -469,15 +472,9 @@ class _ClimateNewEditScreenState extends State<ClimateNewEditScreen> {
     String user_name =  user['user_name'];
 
     if(isNew == true){
-//      List<Map<String, dynamic>> mortalities = await DatabaseHelper.instance.get('observed_mortality');
-//      int mortality_id = mortalities[mortalities.length - 1]['_observed_mortality_id'] + 1;
 
       String climate_id = generate_GlobalIdentifier();
       print("ID:" + climate_id);
-
-//      print(mortality_id);
-//      print(animals_dead);
-//      print(animals_culling);
 
       int id = await DatabaseHelper.instance.insert('observed_climate', {
         DatabaseHelper.observed_climate_id: climate_id,
@@ -494,7 +491,7 @@ class _ClimateNewEditScreenState extends State<ClimateNewEditScreen> {
         DatabaseHelper.observed_climate_observed_by : user_name,
       });
 
-//      print(id);
+      // -----------------------------------------------------------------------
 
       String url = "observedclimate/insert";
 
@@ -512,13 +509,34 @@ class _ClimateNewEditScreenState extends State<ClimateNewEditScreen> {
         "user_name": user_name
       };
 
-      dynamic responseJSON = await postData(params, url);
+      var result = await Connectivity().checkConnectivity();
 
-      if(responseJSON['status'] == 'Success'){
+      if(result != ConnectivityResult.none){
+
+        dynamic responseJSON = await postData(params, url);
+
+        if(responseJSON['status'] == 'Success'){
+          Navigator.pop(context);
+          Navigator.pop(context);
+        }
+
+      } else if (result == ConnectivityResult.none) {
+
+        String synchronization_id = generate_GlobalIdentifier();
+
+        int id = await DatabaseHelper.instance.insert('synchronization_queue', {
+          DatabaseHelper.synchronization_queue_id: synchronization_id,
+          DatabaseHelper.synchronization_queue_url: url,
+          DatabaseHelper.synchronization_queue_params : json.encode(params),
+          DatabaseHelper.synchronization_queue_creation_date : creation_date
+        });
+
         Navigator.pop(context);
         Navigator.pop(context);
+
       }
 
+      // -----------------------------------------------------------------------
 
     } else if(isNew == false){
       String climate_id = observationId.toString();
@@ -536,6 +554,8 @@ class _ClimateNewEditScreenState extends State<ClimateNewEditScreen> {
         DatabaseHelper.observed_climate_observed_by : user_name,
       });
 
+      // -----------------------------------------------------------------------
+
       String url = "observedclimate/update";
 
       Map<String, dynamic> params = {
@@ -552,12 +572,34 @@ class _ClimateNewEditScreenState extends State<ClimateNewEditScreen> {
         "user_name": user_name
       };
 
-      dynamic responseJSON = await postData(params, url);
+      var result = await Connectivity().checkConnectivity();
 
-      if(responseJSON['status'] == 'Success'){
+      if(result != ConnectivityResult.none){
+
+        dynamic responseJSON = await postData(params, url);
+
+        if(responseJSON['status'] == 'Success'){
+          Navigator.pop(context);
+          Navigator.pop(context);
+        }
+
+      } else if (result == ConnectivityResult.none) {
+
+        String synchronization_id = generate_GlobalIdentifier();
+
+        int id = await DatabaseHelper.instance.insert('synchronization_queue', {
+          DatabaseHelper.synchronization_queue_id: synchronization_id,
+          DatabaseHelper.synchronization_queue_url: url,
+          DatabaseHelper.synchronization_queue_params : json.encode(params),
+          DatabaseHelper.synchronization_queue_creation_date : creation_date
+        });
+
         Navigator.pop(context);
         Navigator.pop(context);
+
       }
+
+      // -----------------------------------------------------------------------
 
     }
 

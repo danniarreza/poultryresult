@@ -4,7 +4,7 @@ generate_GlobalIdentifier() {
 
   var ms = (DateTime.now()).millisecondsSinceEpoch;
 
-  var randomNumber = Random().nextInt(10);
+  var randomNumber = Random().nextInt(20);
   String globalidentifier = (ms * randomNumber).toString();
 
   return globalidentifier;

@@ -1,8 +1,10 @@
+import 'package:connectivity/connectivity.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:poultryresult/Services/NotificationPlugin.dart';
 import 'package:poultryresult/Services/database_helper.dart';
 import 'package:poultryresult/Services/rest_api.dart';
+import 'package:poultryresult/Widgets/dialogs.dart';
 import 'package:poultryresult/Widgets/homescreenappbar.dart';
 import 'package:poultryresult/Widgets/homescreenheader.dart';
 import 'package:poultryresult/Widgets/Sidebar_Main.dart';
@@ -106,6 +108,60 @@ class _DailyObserveHomeScreenState extends State<DailyObserveHomeScreen> {
 //      notificationPlugin.showNotification('Welcome to ${farm_sites[0]['farm_sites_name']}!', 'Please select the farm house');
     });
 
+  }
+
+  _clearQueueSynch() async {
+
+    Dialogs.waitingDialog(context, "Synchronizing...", "Please Wait", false);
+
+    List<Map<String, dynamic>> queuesFromDB = await DatabaseHelper.instance.get('synchronization_queue');
+
+    List<Map<String, dynamic>> queues = List<Map<String, dynamic>>();
+
+    List<Map<String, dynamic>> leftOverQueues = List<Map<String, dynamic>>();
+
+    if(queuesFromDB.length > 0){
+      queues.addAll(queuesFromDB);
+      queues.sort((a,b) => a['synchronization_queue_creation_date'].toString().compareTo(b['synchronization_queue_creation_date'].toString()));
+
+      Future.forEach(queues, (queue) async {
+        dynamic responseJSON = await postDataQueue(queue['synchronization_queue_params'], queue['synchronization_queue_url']);
+        print(responseJSON);
+        if(responseJSON['status'] == 'Success'){
+          await DatabaseHelper.instance.deleteWhere('synchronization_queue', ['_synchronization_queue_id'], [queue['_synchronization_queue_id']]);
+        } else {
+          leftOverQueues.add(queue);
+          await DatabaseHelper.instance.deleteWhere('synchronization_queue', ['_synchronization_queue_id'], [queue['_synchronization_queue_id']]);
+        }
+      }).then((value) {
+        Navigator.pop(context);
+        Future.delayed(Duration(milliseconds: 500), (){
+          Dialogs.confirmContinueDialog(context, "You are synched!", "Done", true);
+        });
+      });
+    } else {
+      Navigator.pop(context);
+
+      Dialogs.confirmContinueDialog(context, "You are synched!", "Done", true);
+
+    }
+
+  }
+  
+  _triggerSync() async {
+    var result = await Connectivity().checkConnectivity();
+
+    if(result == ConnectivityResult.none){
+      final dialogAction = await Dialogs.errorRetryDialog(context, "You are offline", "Retry", true);
+
+      if(dialogAction == DialogAction.yes){
+        Future.delayed(Duration(seconds: 1), (){
+          _triggerSync();
+        });
+      }
+    } else if(result != ConnectivityResult.none) {
+      _clearQueueSynch();
+    }
   }
 
   _buildManagementLocationList(){
@@ -308,6 +364,17 @@ class _DailyObserveHomeScreenState extends State<DailyObserveHomeScreen> {
             ),
           ],
         ),
+      ),
+
+      floatingActionButton: FloatingActionButton(
+        child: Icon(Icons.sync),
+        backgroundColor: Color.fromRGBO(253, 184, 19, 1),
+        focusColor: Colors.white,
+        onPressed: () async {
+          
+          _triggerSync();
+
+        },
       ),
     );
   }
